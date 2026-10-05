@@ -3,6 +3,11 @@
 
 export const SCHEMA_VERSION = 1;
 
+/** localStorage の上限の目安 (ブラウザにより 5MB 前後) */
+export const LIMIT_BYTES = 5 * 1024 * 1024;
+/** これを超えたら容量の警告を出す */
+export const WARNING_RATIO = 0.8;
+
 const PREFIX = 'sp:';
 
 export const KEYS = {

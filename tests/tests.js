@@ -402,6 +402,26 @@ test('attendance.countDay / filterByAttendance / describe', () => {
   assertEqual([describe(day.a), describe(day.b), describe(day.c), describe(undefined)], ['参加 / ✓現着', '参加 / 未着', '不参加', '未入力']);
 });
 
+// --- PWA ---
+test('sw.js: 先にキャッシュするファイルがすべて存在する (1つでも無いとオフライン用キャッシュが作られない)', async () => {
+  const source = await (await fetch('../sw.js', { cache: 'no-store' })).text();
+  const paths = [...source.matchAll(/'(\.\/[^']*)'/g)].map((m) => m[1]);
+  if (paths.length < 10) throw new Error(`PRECACHE が読み取れない (${paths.length}件)`);
+  const missing = [];
+  for (const path of paths) {
+    const res = await fetch(new URL(path, new URL('../', location.href)), { method: 'HEAD', cache: 'no-store' });
+    if (!res.ok) missing.push(path);
+  }
+  assertEqual(missing, []);
+});
+test('manifest.json: 必要な項目とアイコン', async () => {
+  const manifest = await (await fetch('../manifest.json', { cache: 'no-store' })).json();
+  assertEqual([manifest.name, manifest.start_url, manifest.display], ['Formation Board', './#/home', 'standalone']);
+  const sizes = manifest.icons.map((i) => i.sizes);
+  if (!sizes.includes('192x192') || !sizes.includes('512x512')) throw new Error('192 / 512 のアイコンが無い');
+  if (!manifest.icons.some((i) => i.purpose === 'maskable')) throw new Error('maskable アイコンが無い');
+});
+
 // --- 実行 ---
 const list = document.getElementById('results');
 let failed = 0;
