@@ -308,6 +308,8 @@ export function render(root, [boardId]) {
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '縮小', onclick: () => zoomStep(1 / ZOOM_STEP) }, '−'),
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '全体表示', title: '全体表示', onclick: fitAll }, '⛶'),
   );
+  const maximizeButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setMaximized(!maximized) });
+  zoomControls.append(maximizeButton);
   const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, detailCard.el, zoomControls);
 
   // ---- ベンチ ----
@@ -891,8 +893,32 @@ export function render(root, [boardId]) {
     },
   });
 
+  // ---- 最大化 (コートだけを画面いっぱいに) ----
+  // ヘッダー・タブバー・選手一覧・ベンチを隠し、ツールバーはコートの上に浮かせる
+  // ブラウザの全画面表示にも対応していれば一緒に使う (Esc で全画面を抜けたら最大化も戻す)
+  let maximized = false;
+
+  function setMaximized(on) {
+    maximized = on;
+    document.body.classList.toggle('board-maximized', on);
+    maximizeButton.textContent = on ? '⤡' : '⤢';
+    maximizeButton.setAttribute('aria-label', on ? '最大化を戻す (F)' : '最大化 (F)');
+    maximizeButton.title = on ? '最大化を戻す (F)' : '最大化 (F)';
+    maximizeButton.setAttribute('aria-pressed', String(on));
+    if (on) {
+      setPanelOpen(false);
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  function onFullscreenChange() {
+    if (!document.fullscreenElement && maximized) setMaximized(false);
+  }
+
   // キーボード: Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z)、スペースを押している間は手のひら、V/P/A/E/H でモード切替
-  // Delete / Backspace で選択中の敵マーカーを削除、Esc で選択解除
+  // F で最大化 / 戻す、Delete / Backspace で選択中の敵マーカーを削除、Esc で選択解除 (最大化中は戻す)
   function onKeyDown(e) {
     if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
     const mod = e.ctrlKey || e.metaKey;
@@ -912,11 +938,15 @@ export function render(root, [boardId]) {
     } else if (e.key === 'Escape') {
       onTapPiece(null);
       closeMenu();
+      if (maximized) setMaximized(false);
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId?.startsWith('m:')) {
       record();
       removeMarker(selectedId.slice(2));
       detailCard.hide();
       commit();
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 'f') {
+      e.preventDefault();
+      setMaximized(!maximized);
     } else if (!mod && !e.altKey) {
       const mode = toolbar.modeForKey(e.key);
       if (mode) toolbar.setMode(mode);
@@ -945,10 +975,12 @@ export function render(root, [boardId]) {
   window.addEventListener('keyup', onKeyUp);
   window.addEventListener('pagehide', onPageHide);
   document.addEventListener('pointerdown', onDocumentPointerDown);
+  document.addEventListener('fullscreenchange', onFullscreenChange);
 
   const observer = new ResizeObserver(resize);
   observer.observe(stage);
   updateCursor();
+  setMaximized(false);
   renderAll();
   resize();
 
@@ -959,6 +991,8 @@ export function render(root, [boardId]) {
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('pagehide', onPageHide);
     document.removeEventListener('pointerdown', onDocumentPointerDown);
+    document.removeEventListener('fullscreenchange', onFullscreenChange);
+    if (maximized) setMaximized(false);
     if (!board) return; // 削除済み
     if (isEmptyBoard(board)) {
       scheduleSave.cancel();

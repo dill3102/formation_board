@@ -885,3 +885,44 @@ body[data-route="board"] .app-main {
     padding-bottom: 0;
   }
 }
+
+/* ---- 最大化 (F キー / ⤢ ボタン): コートだけを画面いっぱいに ---- */
+body.board-maximized .app-header,
+body.board-maximized .board-header,
+body.board-maximized .board-panel,
+body.board-maximized .bench {
+  display: none;
+}
+
+body.board-maximized .app-main {
+  height: 100dvh;
+  padding: 0;
+}
+
+body.board-maximized .board {
+  position: relative;
+}
+
+/* ツールバーはコートの上に浮かせる */
+body.board-maximized .board-toolbar {
+  position: absolute;
+  top: var(--space-2);
+  left: 50%;
+  z-index: 30;
+  flex-wrap: nowrap;
+  max-width: calc(100% - var(--space-4));
+  transform: translateX(-50%);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+body.board-maximized .tool-label {
+  display: none;
+}
+
+/* 詳細カードはツールバーの下に */
+body.board-maximized .detail-card {
+  top: 64px;
+}
