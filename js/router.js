@@ -26,6 +26,7 @@ export function startRouter(root, views) {
 
     if (typeof cleanup === 'function') cleanup();
     root.replaceChildren();
+    document.body.dataset.route = name; // 画面ごとのレイアウト (CSS) を描画前に切り替える
     cleanup = views[name].render(root, params);
 
     for (const link of document.querySelectorAll('[data-route]')) {

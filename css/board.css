@@ -1,0 +1,186 @@
+/* 配置ボード */
+
+/* ボード画面はメイン領域を画面いっぱいに使う */
+body[data-route="board"] .app-main {
+  max-width: none;
+  height: calc(100dvh - var(--header-height));
+  padding: 0;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.board-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.board-topbar h1 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.board-note {
+  margin: 0;
+  color: var(--color-text-sub);
+  font-size: 0.8rem;
+}
+
+.board-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+}
+
+.board-court {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.board-pieces {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---- 選手アイコン ---- */
+.piece,
+.slot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--piece-size);
+  height: var(--piece-size);
+  will-change: transform;
+}
+
+.piece {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.piece .avatar {
+  width: 100%;
+  height: 100%;
+  border: 2px solid #fff;
+  background: #1f6feb;
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.piece-label {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 50%;
+  max-width: 80px;
+  padding: 0 4px;
+  overflow: hidden;
+  transform: translateX(-50%);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.piece.is-selected .avatar {
+  border-color: #fdd835;
+  box-shadow: 0 0 0 3px rgba(253, 216, 53, 0.6), 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.piece.is-dragging {
+  z-index: 10;
+  cursor: grabbing;
+}
+
+.piece.is-dragging .avatar {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* 空きのポジション枠 */
+.slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- 表示コントロール ---- */
+.zoom-controls {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.zoom-button {
+  width: 44px;
+  height: 40px;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.zoom-button:last-child {
+  border-bottom: none;
+}
+
+.zoom-button:hover {
+  background: var(--color-bg);
+}
+
+.zoom-label {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 767px) {
+  .zoom-controls {
+    right: var(--space-2);
+    bottom: var(--space-2);
+  }
+
+  .zoom-button {
+    width: 40px;
+    height: 36px;
+  }
+
+  body[data-route="board"] .app-main {
+    height: calc(100dvh - var(--header-height) - var(--tabbar-height) - env(safe-area-inset-bottom));
+    padding-bottom: 0;
+  }
+}

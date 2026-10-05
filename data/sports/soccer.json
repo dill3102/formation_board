@@ -5,6 +5,7 @@
   "teamSize": 11,
   "court": {
     "aspect": 1.54,
+    "size": [105, 68],
     "background": "#3a8a3a",
     "lines": "soccer"
   },

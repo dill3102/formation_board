@@ -6,6 +6,8 @@ import * as storage from '../js/storage.js';
 import {
   findDuplicateNumbers, sortPlayers, filterPlayers, removeFromAttendance, removeFromBoards, parsePlayerLines,
 } from '../js/models/players.js';
+import { Viewport } from '../js/board/viewport.js';
+import { assignPlayersToSlots } from '../js/board/formation.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -129,6 +131,86 @@ test('parsePlayerLines: カンマ・タブ・全角カンマ、空行は無視',
 });
 test('parsePlayerLines: スポーツ未選択なら背番号は無視', () => {
   assertEqual(parsePlayerLines('山田, 10', []), [{ name: '山田', numbers: {} }]);
+});
+
+// --- board/viewport ---
+const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+function assertPoint(actual, expected) {
+  if (!near(actual.x, expected.x) || !near(actual.y, expected.y)) {
+    throw new Error(`期待値: ${JSON.stringify(expected)}\n実際:   ${JSON.stringify(actual)}`);
+  }
+}
+
+test('viewport: 横長 = 自陣が左、全体表示で中央', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448); // 余白 24px を除くと 800 x 400 → ちょうど収まる
+  assertEqual(v.portrait, false);
+  assertPoint(v.courtToScreen(0, 0), { x: 24, y: 24 });
+  assertPoint(v.courtToScreen(1, 1), { x: 824, y: 424 });
+  assertPoint(v.courtToScreen(0.5, 0.5), { x: 424, y: 224 });
+});
+test('viewport: 縦長 = 自陣が下・敵陣が上', () => {
+  const v = new Viewport(2);
+  v.resize(448, 848);
+  assertEqual(v.portrait, true);
+  assertPoint(v.courtToScreen(0, 0), { x: 24, y: 824 }); // 自ゴール側 = 下
+  assertPoint(v.courtToScreen(1, 0), { x: 24, y: 24 }); // 敵ゴール側 = 上
+});
+test('viewport: 画面 ⇔ コートの往復', () => {
+  for (const [w, hgt] of [[800, 500], [400, 900]]) {
+    const v = new Viewport(1.54);
+    v.resize(w, hgt);
+    v.setZoom(2.3, 100, 120);
+    v.panBy(-37, 15);
+    const s = v.courtToScreen(0.3, 0.8);
+    assertPoint(v.screenToCourt(s.x, s.y), { x: 0.3, y: 0.8 });
+  }
+});
+test('viewport: ズームは 50%〜400% で、指定した点は動かない', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448);
+  const before = v.screenToCourt(300, 200);
+  v.zoomBy(1.5, 300, 200);
+  assertPoint(v.screenToCourt(300, 200), before);
+  v.setZoom(10);
+  assertEqual(v.zoom, 4);
+  v.setZoom(0.1);
+  assertEqual(v.zoom, 0.5);
+});
+test('viewport: パンしてもコートの端は画面中央まで', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448);
+  v.setZoom(4);
+  v.panBy(100000, 100000);
+  assertPoint(v.courtToScreen(0, 0), { x: 424, y: 224 });
+});
+test('viewport: メートル変換行列がコート座標と一致', () => {
+  for (const [w, hgt] of [[848, 448], [448, 848]]) {
+    const v = new Viewport(105 / 68);
+    v.resize(w, hgt);
+    const [a, b, c, d, e, f] = v.meterTransform(105, 68);
+    const mx = 30, my = 50;
+    const s = v.courtToScreen(mx / 105, my / 68);
+    assertPoint({ x: a * mx + c * my + e, y: b * mx + d * my + f }, s);
+  }
+});
+
+// --- board/formation ---
+test('assignPlayersToSlots: ポジション優先、余りは空き枠へ、溢れは rest', () => {
+  const slots = [{ position: 'GK' }, { position: 'DF' }, { position: 'FW' }];
+  const players = [
+    { id: 'a', sports: { soccer: { positions: ['FW'] } } },
+    { id: 'b', sports: { soccer: { positions: ['MF', 'DF'] } } },
+    { id: 'c', sports: { soccer: { positions: ['GK'] } } },
+    { id: 'd', sports: { soccer: { positions: [] } } },
+  ];
+  const { slots: result, rest } = assignPlayersToSlots(slots, players, 'soccer');
+  assertEqual(result.map((s) => s.playerId), ['c', 'b', 'a']);
+  assertEqual(rest.map((p) => p.id), ['d']);
+});
+test('assignPlayersToSlots: 人数が足りなければ空き枠 (null)', () => {
+  const { slots } = assignPlayersToSlots([{ position: 'GK' }, { position: 'DF' }], [{ id: 'x', sports: {} }], 'soccer');
+  assertEqual(slots.map((s) => s.playerId), ['x', null]);
 });
 
 // --- 実行 ---
