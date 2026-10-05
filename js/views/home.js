@@ -100,6 +100,7 @@ export function render(root) {
   });
 
   root.append(
+    h('a', { class: 'help-link', href: '#/help' }, '📖 使い方'),
     h('section', { class: 'card' },
       h('h1', {}, '新しい配置を作る'),
       h('div', { class: 'sport-buttons' },

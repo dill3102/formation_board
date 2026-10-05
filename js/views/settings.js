@@ -134,7 +134,7 @@ export function render(root) {
       h('p', { class: 'note' }, 'この端末のこのブラウザに保存されている、このサイトのデータをすべて削除します。'),
       h('button', { class: 'btn btn-danger', type: 'button', onclick: deleteAll }, '全データを削除'),
     ),
-    h('p', { class: 'note version' }, `Formation Board バージョン ${APP_VERSION}`),
+    h('p', { class: 'note version' }, h('a', { href: '#/help' }, '📖 使い方'), ` ・ Formation Board バージョン ${APP_VERSION}`),
   );
 
   renderUsage();

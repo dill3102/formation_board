@@ -926,3 +926,35 @@ body.board-maximized .tool-label {
 body.board-maximized .detail-card {
   top: 64px;
 }
+
+/* ---- ボール ---- */
+.piece-ball {
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ball-symbol {
+  font-size: calc(var(--piece-size) * 0.9);
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.ball-plain {
+  width: 70%;
+  height: 70%;
+  border: 1px solid #555;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.piece-ball.is-selected .ball-symbol,
+.piece-ball.is-selected .ball-plain {
+  filter: drop-shadow(0 0 3px #fdd835) drop-shadow(0 0 3px #fdd835);
+}
+
+.piece-ball.is-dragging {
+  z-index: 11;
+}

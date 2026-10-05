@@ -4,6 +4,7 @@ import { h } from '../util/dom.js';
 import { createAvatar } from '../ui/avatar.js';
 
 export const PIECE_SIZE = 44; // アイコンの直径 (px)
+export const BALL_SIZE = 30; // ボールの直径 (px)
 
 export class PieceLayer {
   /**
@@ -35,6 +36,14 @@ export class PieceLayer {
     this.add(id, el, x, y);
   }
 
+  /** ボール (スポーツのボールの絵文字。無ければ白丸) */
+  addBall(id, symbol, x, y) {
+    const el = h('div', { class: 'piece piece-ball', dataset: { pieceId: id }, title: 'ボール' },
+      symbol ? h('span', { class: 'ball-symbol' }, symbol) : h('span', { class: 'ball-plain' }),
+    );
+    this.add(id, el, x, y, BALL_SIZE);
+  }
+
   /** 画面上の (sx, sy) から radius 以内で一番近いもの。filter で対象を絞る */
   nearest(sx, sy, radius, filter) {
     let best = null;
@@ -57,8 +66,8 @@ export class PieceLayer {
     this.add(id, el, x, y);
   }
 
-  add(id, el, x, y) {
-    el.style.setProperty('--piece-size', `${PIECE_SIZE}px`);
+  add(id, el, x, y, size = PIECE_SIZE) {
+    el.style.setProperty('--piece-size', `${size}px`);
     this.container.append(el);
     this.items.set(id, { el, x, y });
   }

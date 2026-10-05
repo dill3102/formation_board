@@ -21,6 +21,7 @@ export function newBoard(sport, date = todayKey()) {
     sportId: sport.id,
     home: { templateId: null, slots: [], free: [], bench: [] },
     away: { templateId: null, markers: [] },
+    ball: null,
     drawings: [],
     createdAt: now,
     updatedAt: now,
@@ -73,6 +74,7 @@ export function isEmptyBoard(board) {
     !board.home.templateId &&
     !board.away.templateId &&
     board.away.markers.length === 0 &&
+    !board.ball &&
     board.drawings.length === 0;
 }
 

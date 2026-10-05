@@ -15,6 +15,6 @@ export function h(tag, props = {}, ...children) {
       el.setAttribute(key, value === true ? '' : value);
     }
   }
-  el.append(...children.flat().filter((c) => c !== null && c !== undefined && c !== false));
+  el.append(...children.flat(Infinity).filter((c) => c !== null && c !== undefined && c !== false));
   return el;
 }

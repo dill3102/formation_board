@@ -360,6 +360,8 @@ test('boards: 新しい配置は空 / 何か置くと空ではない', () => {
   assertEqual(isEmptyBoard({ ...board, drawings: [{}] }), false);
   assertEqual(isEmptyBoard({ ...board, away: { templateId: null, markers: [{}] } }), false);
   assertEqual(isEmptyBoard({ ...board, home: { ...board.home, bench: ['a'] } }), false);
+  assertEqual(isEmptyBoard({ ...board, ball: { x: 0.5, y: 0.5 } }), false);
+  assertEqual(board.ball, null);
 });
 test('boards: 新しい順 (日付 → 更新日時)', () => {
   const list = [

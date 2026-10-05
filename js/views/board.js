@@ -25,6 +25,7 @@ import { History } from '../board/history.js';
 import { createToolbar } from '../board/toolbar.js';
 import { createDetailCard } from '../board/detail-card.js';
 import { makeDraggable } from '../board/drag-ghost.js';
+import { shortcutTable } from './help.js';
 import {
   locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill, placedPlayers,
 } from '../board/lineup.js';
@@ -177,6 +178,8 @@ export function render(root, [boardId]) {
   const menu = h('div', { class: 'menu', hidden: true },
     h('button', { class: 'menu-item', type: 'button', onclick: () => { closeMenu(); duplicate(); } }, '複製'),
     h('button', { class: 'menu-item', type: 'button', onclick: () => { closeMenu(); openSaveTemplate(); } }, 'テンプレートとして保存'),
+    h('a', { class: 'menu-item', href: '#/help/board' }, '📖 使い方'),
+    h('button', { class: 'menu-item', type: 'button', onclick: () => { closeMenu(); showShortcuts(); } }, 'キーボードショートカット (?)'),
     h('button', { class: 'menu-item menu-danger', type: 'button', onclick: () => { closeMenu(); removeBoard(); } }, 'この配置を削除'),
   );
   const menuButton = h('button', { class: 'tool-button', type: 'button', 'aria-label': 'メニュー', 'aria-haspopup': 'true' }, '⋮');
@@ -216,6 +219,13 @@ export function render(root, [boardId]) {
     board = null; // 離れる時に保存しないように
     showToast('削除しました');
     location.hash = '#/home';
+  }
+
+  function showShortcuts() {
+    openModal({
+      title: 'キーボードショートカット',
+      body: h('div', {}, shortcutTable(), h('p', { class: 'note' }, h('a', { href: '#/help' }, '📖 使い方をすべて見る'))),
+    });
   }
 
   function openSaveTemplate() {
@@ -295,6 +305,8 @@ export function render(root, [boardId]) {
     onUndo: undo,
     onRedo: redo,
     onClear: clearDrawings,
+    ballSymbol: sport.ball,
+    onToggleBall: toggleBall,
   });
 
   // ---- コート ----
@@ -364,6 +376,8 @@ export function render(root, [boardId]) {
       if (player) pieces.addPlayer(`p:${player.id}`, player, sport.id, f.x, f.y);
     }
     for (const m of board.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
+    if (board.ball) pieces.addBall('b:ball', sport.ball, board.ball.x, board.ball.y);
+    toolbar.setBallState(!!board.ball);
     pieces.layout();
     if (selectedId && !pieces.get(selectedId)) {
       selectedId = null;
@@ -544,7 +558,7 @@ export function render(root, [boardId]) {
 
   // ---- 元に戻す / やり直し ----
   function snapshot() {
-    return { home: board.home, away: board.away, drawings: board.drawings };
+    return { home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings };
   }
 
   function record() {
@@ -767,6 +781,19 @@ export function render(root, [boardId]) {
     detailCard.showPlayer({ player, sport, date: board.date, attendance: getDay(board.date)[player.id], actions });
   }
 
+  /** ボールを出す (画面の中央、コートの外なら中央) / しまう */
+  function toggleBall() {
+    record();
+    if (board.ball) {
+      board.ball = null;
+    } else {
+      const c = viewport.screenToCourt(viewport.width / 2, viewport.height / 2);
+      const inside = c.x >= 0 && c.x <= 1 && c.y >= 0 && c.y <= 1;
+      board.ball = inside ? { x: c.x, y: c.y } : { x: 0.5, y: 0.5 };
+    }
+    commit();
+  }
+
   function addMarker(position, c) {
     record();
     board.away = {
@@ -821,6 +848,8 @@ export function render(root, [boardId]) {
           },
         }],
       });
+    } else {
+      detailCard.hide();
     }
   }
 
@@ -857,7 +886,9 @@ export function render(root, [boardId]) {
       const item = pieces.get(id);
       const center = viewport.courtToScreen(item.x, item.y);
 
-      if (id.startsWith('m:')) {
+      if (id === 'b:ball') {
+        board.ball = inStage ? { x: item.x, y: item.y } : null;
+      } else if (id.startsWith('m:')) {
         const markerId = id.slice(2);
         if (!inStage) removeMarker(markerId);
         else {
@@ -918,7 +949,7 @@ export function render(root, [boardId]) {
   }
 
   // キーボード: Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z)、スペースを押している間は手のひら、V/P/A/E/H でモード切替
-  // F で最大化 / 戻す、Delete / Backspace で選択中の敵マーカーを削除、Esc で選択解除 (最大化中は戻す)
+  // F で最大化 / 戻す、? でショートカット一覧、Delete / Backspace で選択中の敵マーカーを削除、Esc で選択解除 (最大化中は戻す)
   function onKeyDown(e) {
     if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('dialog[open]')) return;
     const mod = e.ctrlKey || e.metaKey;
@@ -939,11 +970,20 @@ export function render(root, [boardId]) {
       onTapPiece(null);
       closeMenu();
       if (maximized) setMaximized(false);
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId === 'b:ball') {
+      record();
+      board.ball = null;
+      commit();
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId?.startsWith('m:')) {
       record();
       removeMarker(selectedId.slice(2));
       detailCard.hide();
       commit();
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 'b') {
+      toggleBall();
+    } else if (e.key === '?') {
+      e.preventDefault();
+      showShortcuts();
     } else if (!mod && !e.altKey && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       setMaximized(!maximized);

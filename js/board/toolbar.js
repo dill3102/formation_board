@@ -19,8 +19,10 @@ export const MODES = [
  * @param {() => void} options.onUndo
  * @param {() => void} options.onRedo
  * @param {() => void} options.onClear
+ * @param {string} [options.ballSymbol] ボールの絵文字
+ * @param {() => void} [options.onToggleBall]
  */
-export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onClear }) {
+export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onClear, ballSymbol, onToggleBall }) {
   const state = { ...initial };
 
   // ---- モード ----
@@ -74,6 +76,10 @@ export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onCle
   const undoButton = h('button', { class: 'tool-button', type: 'button', 'aria-label': '元に戻す', title: '元に戻す (Ctrl+Z)' }, '↶');
   const redoButton = h('button', { class: 'tool-button', type: 'button', 'aria-label': 'やり直し', title: 'やり直し (Ctrl+Y)' }, '↷');
   const clearButton = h('button', { class: 'tool-button', type: 'button', 'aria-label': '書き込みを全消去', title: '書き込みを全消去' }, '🗑');
+  const ballButton = h('button', {
+    class: 'tool-button', type: 'button', 'aria-label': 'ボールを出す / しまう', title: 'ボールを出す / しまう (B)', 'aria-pressed': 'false',
+  }, h('span', { class: 'tool-icon', 'aria-hidden': 'true' }, ballSymbol ?? '⚪'), h('span', { class: 'tool-label' }, 'ボール'));
+  ballButton.addEventListener('click', () => onToggleBall?.());
   undoButton.addEventListener('click', onUndo);
   redoButton.addEventListener('click', onRedo);
   clearButton.addEventListener('click', onClear);
@@ -81,7 +87,7 @@ export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onCle
   const el = h('div', { class: 'board-toolbar', role: 'toolbar', 'aria-label': 'ツール' },
     h('div', { class: 'tool-group', role: 'group', 'aria-label': 'モード' }, modeButtons),
     styleGroup,
-    h('div', { class: 'tool-group' }, undoButton, redoButton, clearButton),
+    h('div', { class: 'tool-group' }, ballButton, undoButton, redoButton, clearButton),
   );
 
   function render() {
@@ -116,6 +122,9 @@ export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onCle
     setMode,
     /** キーボードショートカットのキー → モード */
     modeForKey: (key) => MODES.find((m) => m.key === key.toLowerCase())?.id ?? null,
+    setBallState(on) {
+      ballButton.setAttribute('aria-pressed', String(on));
+    },
     setHistoryState(canUndo, canRedo, canClear) {
       undoButton.disabled = !canUndo;
       redoButton.disabled = !canRedo;

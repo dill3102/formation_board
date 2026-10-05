@@ -2,6 +2,7 @@
   "id": "soccer",
   "name": "サッカー",
   "icon": "⚽",
+  "ball": "⚽",
   "teamSize": 11,
   "court": {
     "aspect": 1.54,

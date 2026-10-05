@@ -2,6 +2,7 @@
   "id": "volleyball",
   "name": "バレー",
   "icon": "🏐",
+  "ball": "🏐",
   "teamSize": 6,
   "court": {
     "aspect": 2.0,
