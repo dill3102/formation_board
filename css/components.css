@@ -1,0 +1,79 @@
+/* ボタン・カードなどの共通部品 */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--color-bg);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1a5fcc;
+}
+
+.btn-danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.sport-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.sport-button {
+  flex-direction: column;
+  min-height: 88px;
+  font-weight: 600;
+}
+
+.sport-button .sport-icon {
+  font-size: 1.8rem;
+}
+
+.empty {
+  color: var(--color-text-sub);
+  text-align: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.note {
+  color: var(--color-text-sub);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 767px) {
+  .sport-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

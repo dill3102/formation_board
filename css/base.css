@@ -1,0 +1,76 @@
+/* 色・余白・フォントなどの共通設定 */
+:root {
+  --color-primary: #1f6feb;
+  --color-primary-weak: #e7f0fe;
+  --color-text: #1f2328;
+  --color-text-sub: #636c76;
+  --color-bg: #f6f8fa;
+  --color-surface: #ffffff;
+  --color-border: #d0d7de;
+  --color-danger: #cf222e;
+  --color-warning: #9a6700;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(31, 35, 40, 0.12);
+
+  --header-height: 56px;
+  --tabbar-height: 60px;
+
+  --font: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+h1, h2, h3 {
+  margin: 0 0 var(--space-3);
+  line-height: 1.3;
+}
+
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.15rem; }
+
+p {
+  margin: 0 0 var(--space-3);
+}
+
+a {
+  color: var(--color-primary);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}

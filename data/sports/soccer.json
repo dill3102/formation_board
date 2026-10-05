@@ -1,0 +1,88 @@
+{
+  "id": "soccer",
+  "name": "サッカー",
+  "icon": "⚽",
+  "teamSize": 11,
+  "court": {
+    "aspect": 1.54,
+    "background": "#3a8a3a",
+    "lines": "soccer"
+  },
+  "penColors": ["#ffffff", "#e53935", "#1e88e5", "#fdd835"],
+  "positions": [
+    { "id": "GK", "short": "GK", "name": "ゴールキーパー" },
+    { "id": "DF", "short": "DF", "name": "ディフェンダー" },
+    { "id": "MF", "short": "MF", "name": "ミッドフィルダー" },
+    { "id": "FW", "short": "FW", "name": "フォワード" }
+  ],
+  "formations": [
+    {
+      "id": "4-4-2",
+      "name": "4-4-2",
+      "slots": [
+        { "position": "GK", "x": 0.04, "y": 0.5 },
+        { "position": "DF", "x": 0.15, "y": 0.15 },
+        { "position": "DF", "x": 0.15, "y": 0.38 },
+        { "position": "DF", "x": 0.15, "y": 0.62 },
+        { "position": "DF", "x": 0.15, "y": 0.85 },
+        { "position": "MF", "x": 0.3, "y": 0.15 },
+        { "position": "MF", "x": 0.3, "y": 0.38 },
+        { "position": "MF", "x": 0.3, "y": 0.62 },
+        { "position": "MF", "x": 0.3, "y": 0.85 },
+        { "position": "FW", "x": 0.43, "y": 0.35 },
+        { "position": "FW", "x": 0.43, "y": 0.65 }
+      ]
+    },
+    {
+      "id": "4-3-3",
+      "name": "4-3-3",
+      "slots": [
+        { "position": "GK", "x": 0.04, "y": 0.5 },
+        { "position": "DF", "x": 0.15, "y": 0.15 },
+        { "position": "DF", "x": 0.15, "y": 0.38 },
+        { "position": "DF", "x": 0.15, "y": 0.62 },
+        { "position": "DF", "x": 0.15, "y": 0.85 },
+        { "position": "MF", "x": 0.29, "y": 0.25 },
+        { "position": "MF", "x": 0.29, "y": 0.5 },
+        { "position": "MF", "x": 0.29, "y": 0.75 },
+        { "position": "FW", "x": 0.43, "y": 0.2 },
+        { "position": "FW", "x": 0.43, "y": 0.5 },
+        { "position": "FW", "x": 0.43, "y": 0.8 }
+      ]
+    },
+    {
+      "id": "3-5-2",
+      "name": "3-5-2",
+      "slots": [
+        { "position": "GK", "x": 0.04, "y": 0.5 },
+        { "position": "DF", "x": 0.15, "y": 0.25 },
+        { "position": "DF", "x": 0.15, "y": 0.5 },
+        { "position": "DF", "x": 0.15, "y": 0.75 },
+        { "position": "MF", "x": 0.29, "y": 0.1 },
+        { "position": "MF", "x": 0.27, "y": 0.3 },
+        { "position": "MF", "x": 0.27, "y": 0.5 },
+        { "position": "MF", "x": 0.27, "y": 0.7 },
+        { "position": "MF", "x": 0.29, "y": 0.9 },
+        { "position": "FW", "x": 0.43, "y": 0.35 },
+        { "position": "FW", "x": 0.43, "y": 0.65 }
+      ]
+    },
+    {
+      "id": "4-2-3-1",
+      "name": "4-2-3-1",
+      "slots": [
+        { "position": "GK", "x": 0.04, "y": 0.5 },
+        { "position": "DF", "x": 0.15, "y": 0.15 },
+        { "position": "DF", "x": 0.15, "y": 0.38 },
+        { "position": "DF", "x": 0.15, "y": 0.62 },
+        { "position": "DF", "x": 0.15, "y": 0.85 },
+        { "position": "MF", "x": 0.25, "y": 0.35 },
+        { "position": "MF", "x": 0.25, "y": 0.65 },
+        { "position": "MF", "x": 0.35, "y": 0.2 },
+        { "position": "MF", "x": 0.35, "y": 0.5 },
+        { "position": "MF", "x": 0.35, "y": 0.8 },
+        { "position": "FW", "x": 0.45, "y": 0.5 }
+      ]
+    }
+  ]
+}
