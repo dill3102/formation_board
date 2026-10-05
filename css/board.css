@@ -59,6 +59,158 @@ body[data-route="board"] .app-main {
   pointer-events: none;
 }
 
+/* モードごとのカーソル */
+.board-stage[data-mode="pen"],
+.board-stage[data-mode="arrow"],
+.board-stage[data-mode="pen"] .piece,
+.board-stage[data-mode="arrow"] .piece {
+  cursor: crosshair;
+}
+
+.board-stage[data-mode="eraser"],
+.board-stage[data-mode="eraser"] .piece {
+  cursor: cell;
+}
+
+.board-stage[data-mode="hand"],
+.board-stage[data-mode="hand"] .piece {
+  cursor: grab;
+}
+
+/* ---- ツールバー ---- */
+.board-toolbar {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: 40px;
+  height: 40px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tool-button:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.tool-button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-weak);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.tool-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tool-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.style-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.swatches,
+.widths {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--swatch);
+  cursor: pointer;
+}
+
+.swatch[aria-pressed="true"],
+.swatch-custom.is-selected {
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
+}
+
+.swatch-custom {
+  overflow: hidden;
+  background: conic-gradient(#e53935, #fdd835, #43a047, #1e88e5, #8e24aa, #e53935);
+}
+
+.swatch-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.width-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.width-button[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-weak);
+}
+
+.width-sample {
+  display: block;
+  width: 20px;
+  border-radius: 4px;
+  background: var(--color-text);
+}
+
+.style-toggle {
+  display: none;
+}
+
+.style-preview {
+  display: block;
+  width: 22px;
+  border-radius: 4px;
+  background: var(--swatch);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
 /* ---- 選手アイコン ---- */
 .piece,
 .slot {
@@ -169,6 +321,56 @@ body[data-route="board"] .app-main {
 }
 
 @media (max-width: 767px) {
+  .board-toolbar {
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+    justify-content: space-between;
+  }
+
+  .tool-label {
+    display: none;
+  }
+
+  .tool-button {
+    min-width: 36px;
+    padding: 0 6px;
+  }
+
+  /* 色・太さは ● ボタンで開くパネルに */
+  .style-toggle {
+    display: inline-flex;
+  }
+
+  .style-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: var(--space-2);
+    right: var(--space-2);
+    display: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .style-group.is-open .style-panel {
+    display: flex;
+  }
+
+  .swatch {
+    width: 36px;
+    height: 36px;
+  }
+
+  .width-button {
+    width: 44px;
+    height: 36px;
+  }
+
   .zoom-controls {
     right: var(--space-2);
     bottom: var(--space-2);

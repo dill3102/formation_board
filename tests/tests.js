@@ -8,6 +8,8 @@ import {
 } from '../js/models/players.js';
 import { Viewport } from '../js/board/viewport.js';
 import { assignPlayersToSlots } from '../js/board/formation.js';
+import { History } from '../js/board/history.js';
+import { hitStroke, roundPoint, lineWidthPx } from '../js/board/drawing.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -211,6 +213,54 @@ test('assignPlayersToSlots: ポジション優先、余りは空き枠へ、溢�
 test('assignPlayersToSlots: 人数が足りなければ空き枠 (null)', () => {
   const { slots } = assignPlayersToSlots([{ position: 'GK' }, { position: 'DF' }], [{ id: 'x', sports: {} }], 'soccer');
   assertEqual(slots.map((s) => s.playerId), ['x', null]);
+});
+
+// --- board/history ---
+test('History: undo / redo と、新しい変更で redo が消える', () => {
+  const hst = new History();
+  let state = { n: 0 };
+  hst.push(state); state = { n: 1 };
+  hst.push(state); state = { n: 2 };
+  state = hst.undo(state); assertEqual(state, { n: 1 });
+  state = hst.undo(state); assertEqual(state, { n: 0 });
+  assertEqual(hst.undo(state), null);
+  state = hst.redo(state); assertEqual(state, { n: 1 });
+  hst.push(state); state = { n: 9 };
+  assertEqual(hst.canRedo, false);
+});
+test('History: 積んだ後に元のオブジェクトを変えても影響しない', () => {
+  const hst = new History();
+  const state = { list: [1] };
+  hst.push(state);
+  state.list.push(2);
+  assertEqual(hst.undo(state), { list: [1] });
+});
+test('History: 上限を超えたら古いものから消える', () => {
+  const hst = new History(2);
+  hst.push(1); hst.push(2); hst.push(3);
+  assertEqual(hst.undoStack, [2, 3]);
+});
+
+// --- board/drawing ---
+test('roundPoint: 小数第4位で丸める', () => {
+  assertEqual(roundPoint({ x: 0.123456, y: 0.98765 }), [0.1235, 0.9877]);
+});
+test('hitStroke: 線の近くだけ当たる (太さ・ズームを考慮)', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448); // 100%: コート (0,0) = 画面 (24,24)、(1,1) = (824,424)
+  const pen = { type: 'pen', width: 2, points: [[0, 0.5], [0.5, 0.5]] }; // 画面 y = 224, x = 24〜424
+  if (!hitStroke(pen, 200, 230, v)) throw new Error('近くなのに当たらない');
+  if (hitStroke(pen, 200, 260, v)) throw new Error('遠いのに当たる');
+  if (hitStroke(pen, 600, 224, v)) throw new Error('線の延長上なのに当たる');
+  v.setZoom(4, 200, 224);
+  assertEqual(lineWidthPx(2, v), 16);
+});
+test('hitStroke: 矢印は始点と終点を結ぶ線で判定', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448);
+  const arrow = { type: 'arrow', width: 1, points: [[0, 0], [1, 1]] }; // (24,24) → (824,424)
+  if (!hitStroke(arrow, 424, 224, v)) throw new Error('中点に当たらない');
+  if (hitStroke(arrow, 424, 300, v)) throw new Error('離れているのに当たる');
 });
 
 // --- 実行 ---
