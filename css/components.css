@@ -514,3 +514,135 @@
     bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-3));
   }
 }
+
+/* ---- まとめて追加 ---- */
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.modal-wide {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--color-text-sub);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--color-bg);
+  color: var(--color-danger);
+}
+
+.bulk-table-wrap {
+  overflow-x: auto;
+  margin-bottom: var(--space-2);
+}
+
+.bulk-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bulk-table th {
+  padding: var(--space-1) var(--space-1);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.bulk-table td {
+  padding: 2px var(--space-1);
+}
+
+.bulk-table td .input {
+  width: 100%;
+  min-width: 8em;
+}
+
+.bulk-table .bulk-number .input {
+  width: 4.5em;
+  min-width: 4.5em;
+}
+
+.bulk-index {
+  width: 2em;
+  color: var(--color-text-sub);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.bulk-number,
+.bulk-remove {
+  width: 1%;
+}
+
+.input.is-warning {
+  border-color: var(--color-warning);
+  background: #fff8c5;
+}
+
+.bulk-actions {
+  margin-bottom: var(--space-3);
+}
+
+.bulk-warnings {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  color: var(--color-warning);
+  font-size: 0.875rem;
+}
+
+.bulk-paste-box {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.bulk-paste-box summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.bulk-paste-box .note {
+  margin: var(--space-2) 0;
+}
+
+.bulk-paste {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-2);
+  resize: vertical;
+}
+
+@media (max-width: 767px) {
+  .page-header {
+    flex-wrap: wrap;
+  }
+
+  .modal-full.modal-wide {
+    width: 100vw;
+  }
+
+  .bulk-table td .input {
+    min-width: 6em;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .bulk-table .bulk-number .input {
+    width: 3.6em;
+    min-width: 3.6em;
+  }
+}

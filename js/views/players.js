@@ -6,6 +6,7 @@ import { listSports, getSport } from '../sports.js';
 import { listPlayers, sortPlayers, filterPlayers, handednessLabel } from '../models/players.js';
 import { createAvatar } from '../ui/avatar.js';
 import { openPlayerEditor } from './player-edit.js';
+import { openPlayerBulkAdd } from './player-bulk-add.js';
 
 const SORTS_ALL = [
   { id: 'name', label: '名前順' },
@@ -45,6 +46,7 @@ export function render(root) {
   const sortSelect = h('select', { class: 'input', 'aria-label': '並び順' });
   const search = h('input', { type: 'search', class: 'input', placeholder: '🔍 名前で検索', 'aria-label': '名前で検索' });
   const addButton = h('button', { class: 'btn btn-primary', type: 'button' }, '＋ 選手を追加');
+  const bulkAddButton = h('button', { class: 'btn', type: 'button' }, 'まとめて追加');
   const list = h('ul', { class: 'player-list' });
 
   sportSelect.value = view.sportFilter;
@@ -63,7 +65,7 @@ export function render(root) {
 
     title.textContent = `選手一覧 (${all.length}人)`;
     if (all.length === 0) {
-      list.replaceChildren(h('li', { class: 'empty' }, 'まだ選手が登録されていません。「＋ 選手を追加」から登録してください'));
+      list.replaceChildren(h('li', { class: 'empty' }, 'まだ選手が登録されていません。「＋ 選手を追加」または「まとめて追加」から登録してください'));
       return;
     }
     if (players.length === 0) {
@@ -115,10 +117,13 @@ export function render(root) {
     renderList();
   });
   addButton.addEventListener('click', () => edit());
+  bulkAddButton.addEventListener('click', async () => {
+    if (await openPlayerBulkAdd({ sportId: getSport(view.sportFilter)?.id ?? null })) renderList();
+  });
 
   root.append(
     h('section', { class: 'card' },
-      h('div', { class: 'page-header' }, title, addButton),
+      h('div', { class: 'page-header' }, title, h('div', { class: 'page-actions' }, bulkAddButton, addButton)),
       h('div', { class: 'toolbar' }, sportSelect, sortSelect, search),
       list,
     ),

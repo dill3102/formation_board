@@ -69,6 +69,26 @@ export function savePlayer(player, photo = undefined) {
   return saved;
 }
 
+/**
+ * 複数の新しい選手をまとめて追加する (写真なし)。1回の書き込みで保存
+ * @param {object[]} drafts
+ * @returns {object[]} 保存した選手
+ * @throws {StorageFullError} 容量オーバー (その場合は1人も追加されない)
+ */
+export function addPlayers(drafts) {
+  const now = new Date().toISOString();
+  const added = drafts.map((d) => ({
+    ...newPlayer(),
+    ...d,
+    id: d.id ?? createId(),
+    name: d.name.trim(),
+    createdAt: now,
+    updatedAt: now,
+  }));
+  storage.write(KEYS.players, [...listPlayers(), ...added]);
+  return added;
+}
+
 /** 選手を削除し、写真・出欠・保存済み配置からも外す */
 export function deletePlayer(playerId) {
   storage.write(KEYS.players, listPlayers().filter((p) => p.id !== playerId));
@@ -137,6 +157,22 @@ export function findDuplicateNumbers(player, players) {
     if (others.length > 0) result[sportId] = others;
   }
   return result;
+}
+
+/**
+ * 貼り付けたテキストを選手の行に分解する (まとめて追加用)
+ * 1行 = 1人。「名前<区切り>背番号<区切り>背番号…」(区切り = タブ / カンマ / 全角カンマ)
+ * 背番号は sportIds の順に対応させる
+ * @returns {{ name: string, numbers: Record<string, string> }[]}
+ */
+export function parsePlayerLines(text, sportIds) {
+  return text.split(/\r?\n/)
+    .map((line) => line.split(/\t|,|，/).map((cell) => cell.trim()))
+    .filter(([name]) => name)
+    .map(([name, ...numbers]) => ({
+      name,
+      numbers: Object.fromEntries(sportIds.map((id, i) => [id, numbers[i] ?? ''])),
+    }));
 }
 
 const collator = new Intl.Collator('ja');

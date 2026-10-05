@@ -203,9 +203,9 @@ export function openPlayerEditor(playerId = null) {
       try {
         const saved = savePlayer(draft, photo);
         const dupCount = Object.keys(findDuplicateNumbers(saved, listPlayers())).length;
-        showToast(dupCount ? '保存しました (背番号の重複があります)' : '保存しました');
         changed = true;
         modal.close();
+        showToast(dupCount ? '保存しました (背番号の重複があります)' : '保存しました');
       } catch (err) {
         if (err instanceof StorageFullError) {
           showToast('保存容量がいっぱいです。写真や古い配置を削除してください', 'error', 4000);
@@ -223,9 +223,9 @@ export function openPlayerEditor(playerId = null) {
         '\nこの操作は元に戻せません。';
       if (!(await confirmDialog(message, { title: '選手を削除', okLabel: '削除', danger: true }))) return;
       deletePlayer(draft.id);
-      showToast('削除しました');
       changed = true;
       modal.close();
+      showToast('削除しました');
     });
 
     renderPhoto();

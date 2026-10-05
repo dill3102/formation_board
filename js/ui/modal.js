@@ -7,11 +7,13 @@ import { h } from '../util/dom.js';
  * @param {Node} options.body
  * @param {Node[]} [options.footer] 下部のボタン
  * @param {boolean} [options.fullscreenOnMobile]
+ * @param {boolean} [options.wide] 横幅を広くする (表など)
  * @param {() => void} [options.onClose]
  */
-export function openModal({ title, body, footer = [], fullscreenOnMobile = false, onClose }) {
+export function openModal({ title, body, footer = [], fullscreenOnMobile = false, wide = false, onClose }) {
   const closeButton = h('button', { class: 'modal-close', type: 'button', 'aria-label': '閉じる' }, '✕');
-  const dialog = h('dialog', { class: fullscreenOnMobile ? 'modal modal-full' : 'modal' },
+  const classes = ['modal', fullscreenOnMobile && 'modal-full', wide && 'modal-wide'].filter(Boolean).join(' ');
+  const dialog = h('dialog', { class: classes },
     h('header', { class: 'modal-header' }, h('h2', {}, title), closeButton),
     h('div', { class: 'modal-body' }, body),
     footer.length > 0 && h('footer', { class: 'modal-footer' }, footer),

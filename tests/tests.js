@@ -4,7 +4,7 @@ import { toDateKey, fromDateKey, formatShort } from '../js/util/date.js';
 import { debounce } from '../js/util/debounce.js';
 import * as storage from '../js/storage.js';
 import {
-  findDuplicateNumbers, sortPlayers, filterPlayers, removeFromAttendance, removeFromBoards,
+  findDuplicateNumbers, sortPlayers, filterPlayers, removeFromAttendance, removeFromBoards, parsePlayerLines,
 } from '../js/models/players.js';
 
 const tests = [];
@@ -116,6 +116,19 @@ test('removeFromBoards: 枠は空き枠に、自由配置・ベンチからは�
   assertEqual(result.home.slots.map((s) => s.playerId), [null, 'p2']);
   assertEqual(result.home.free, []);
   assertEqual(result.home.bench, ['p3']);
+});
+
+test('parsePlayerLines: カンマ・タブ・全角カンマ、空行は無視', () => {
+  const text = '山田 太郎, 10, 7\n\n佐藤\t4\n鈴木，9\n  \n田中';
+  assertEqual(parsePlayerLines(text, ['soccer', 'basketball']), [
+    { name: '山田 太郎', numbers: { soccer: '10', basketball: '7' } },
+    { name: '佐藤', numbers: { soccer: '4', basketball: '' } },
+    { name: '鈴木', numbers: { soccer: '9', basketball: '' } },
+    { name: '田中', numbers: { soccer: '', basketball: '' } },
+  ]);
+});
+test('parsePlayerLines: スポーツ未選択なら背番号は無視', () => {
+  assertEqual(parsePlayerLines('山田, 10', []), [{ name: '山田', numbers: {} }]);
 });
 
 // --- 実行 ---
