@@ -126,7 +126,7 @@ export function applyTemplate(home, templateId, slots, players, sportId) {
 }
 
 // ---- 仮の選手 (人数が足りない時の穴埋め) ----
-// home.guests = [{ id: "guest-...", name: "仮1", position: "FW" }]
+// home.guests = [{ id: "guest-...", name: "仮1", position: "FW", number?: "10" }]  (number は共有から取り込んだ時だけ)
 // その配置の中だけの選手 (選手名簿には入らない)。配置から外れたら消す (pruneGuests)
 
 /** 足りない人数: テンプレートがあれば空き枠の数、無ければ 1チームの人数 - コート上の人数 */
@@ -179,7 +179,7 @@ export function guestAsPlayer(guest, sportId) {
     handedness: null,
     hasPhoto: false,
     guest: true,
-    sports: { [sportId]: { number: '', positions: guest.position ? [guest.position] : [] } },
+    sports: { [sportId]: { number: guest.number ?? '', positions: guest.position ? [guest.position] : [] } },
   };
 }
 

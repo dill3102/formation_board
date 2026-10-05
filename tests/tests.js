@@ -16,6 +16,7 @@ import {
 } from '../js/board/lineup.js';
 import { newBoard, isEmptyBoard, sortBoards } from '../js/models/boards.js';
 import { applyStatus, applyArrived, countDay, filterByAttendance, describe } from '../js/models/attendance.js';
+import { toShareData, fromShareData, encodeShare, decodeShare } from '../js/share.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -430,6 +431,78 @@ test('attendance.countDay / filterByAttendance / describe', () => {
   assertEqual(filterByAttendance(ps, day, 'yes').map((p) => p.id), ['a', 'b']);
   assertEqual(filterByAttendance(ps, day, 'arrived').map((p) => p.id), ['a']);
   assertEqual([describe(day.a), describe(day.b), describe(day.c), describe(undefined)], ['参加 / ✓現着', '参加 / 未着', '不参加', '未入力']);
+});
+
+// --- share ---
+const shareSport = { id: 'soccer', penColors: ['#ffffff', '#e53935', '#1e88e5', '#fdd835'] };
+function shareBoard() {
+  const players = {
+    a: { id: 'a', name: '山田', sports: { soccer: { number: '10', positions: ['FW'] } } },
+    b: { id: 'b', name: '佐藤', sports: { soccer: { number: '4', positions: ['DF'] } } },
+    c: { id: 'c', name: '鈴木', sports: { soccer: { number: '', positions: [] } } },
+  };
+  return {
+    board: {
+      name: '10/12 練習試合', date: '2026-10-12',
+      home: {
+        slots: [{ position: 'FW', x: 0.43, y: 0.5, playerId: 'a' }, { position: 'GK', x: 0.04, y: 0.5, playerId: null }],
+        free: [{ playerId: 'b', x: 0.2, y: 0.3 }],
+        bench: ['c'],
+      },
+      away: { markers: [{ id: 'm', position: 'GK', x: 0.96, y: 0.5 }] },
+      ball: { x: 0.5, y: 0.5 },
+      drawings: [
+        { type: 'arrow', color: '#e53935', width: 2, points: [[0.43, 0.5], [0.6, 0.4]] },
+        { type: 'pen', color: '#123456', width: 3, points: [[0.1, 0.1], [0.12, 0.11], [0.15, 0.13]] },
+      ],
+    },
+    playerOf: (id) => players[id] ?? null,
+  };
+}
+test('share: 文字列にして戻すと同じ配置になる', async () => {
+  const { board, playerOf } = shareBoard();
+  const code = await encodeShare(toShareData(board, shareSport, playerOf));
+  if (!/^[zj][A-Za-z0-9_-]+$/.test(code)) throw new Error(`URL に使えない文字がある: ${code}`);
+  const shared = fromShareData(await decodeShare(code), shareSport);
+  assertEqual([shared.sportId, shared.name, shared.date], ['soccer', '10/12 練習試合', '2026-10-12']);
+  assertEqual(shared.players.map((p) => [p.name, p.sports.soccer.number, p.sports.soccer.positions]),
+    [['山田', '10', ['FW']], ['佐藤', '4', ['DF']], ['鈴木', '', []]]);
+  assertEqual(shared.home.slots, [{ position: 'GK', x: 0.04, y: 0.5, playerId: null }]);
+  assertEqual(shared.home.free, [{ playerId: 's0', x: 0.43, y: 0.5 }, { playerId: 's1', x: 0.2, y: 0.3 }]);
+  assertEqual(shared.home.bench, ['s2']);
+  assertEqual(shared.away.markers.map((m) => [m.position, m.x, m.y]), [['GK', 0.96, 0.5]]);
+  assertEqual(shared.ball, { x: 0.5, y: 0.5 });
+  assertEqual(shared.drawings.map((d) => [d.type, d.color, d.width, d.points]), [
+    ['arrow', '#e53935', 2, [[0.43, 0.5], [0.6, 0.4]]],
+    ['pen', '#123456', 3, [[0.1, 0.1], [0.12, 0.11], [0.15, 0.13]]],
+  ]);
+});
+test('share: 11対11 + 矢印5本 + ペン2本 で URL が短い (1000文字未満)', async () => {
+  const players = {};
+  const slots = [];
+  for (let i = 0; i < 11; i++) {
+    players[`p${i}`] = { id: `p${i}`, name: `選手${i + 1}`, sports: { soccer: { number: String(i + 1), positions: ['MF'] } } };
+    slots.push({ position: 'MF', x: 0.05 + i * 0.04, y: (i % 4) * 0.25 + 0.1, playerId: `p${i}` });
+  }
+  const markers = slots.map((s, i) => ({ id: `m${i}`, position: 'MF', x: 1 - s.x, y: 1 - s.y }));
+  const pen = (k) => ({ type: 'pen', color: '#e53935', width: 2, points: Array.from({ length: 40 }, (_, i) => [0.3 + i * 0.005, 0.3 + Math.sin(i / 5 + k) * 0.05]) });
+  const arrows = Array.from({ length: 5 }, (_, i) => ({ type: 'arrow', color: '#ffffff', width: 2, points: [[0.2 + i * 0.05, 0.2], [0.4 + i * 0.05, 0.4]] }));
+  const board = {
+    name: '10/12 練習試合 前半', date: '2026-10-12',
+    home: { slots, free: [], bench: [] }, away: { markers }, ball: { x: 0.5, y: 0.5 },
+    drawings: [...arrows, pen(0), pen(1)],
+  };
+  const code = await encodeShare(toShareData(board, shareSport, (id) => players[id]));
+  if (code.length >= 1000) throw new Error(`${code.length}文字`);
+});
+test('share: 壊れた文字列はエラー', async () => {
+  let failed = false;
+  try {
+    fromShareData(await decodeShare('zこわれた'), shareSport);
+  } catch {
+    failed = true;
+  }
+  assertEqual(failed, true);
 });
 
 // --- PWA ---

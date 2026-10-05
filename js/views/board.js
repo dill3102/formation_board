@@ -26,6 +26,7 @@ import { createToolbar } from '../board/toolbar.js';
 import { createDetailCard } from '../board/detail-card.js';
 import { makeDraggable } from '../board/drag-ghost.js';
 import { shortcutTable } from './help.js';
+import { toShareData, encodeShare, shareUrl } from '../share.js';
 import {
   locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill, placedPlayers,
   guestsNeeded, fillWithGuests, pruneGuests, guestAsPlayer,
@@ -187,6 +188,7 @@ export function render(root, [boardId]) {
   });
 
   const menu = h('div', { class: 'menu', hidden: true },
+    h('button', { class: 'menu-item', type: 'button', onclick: () => { closeMenu(); openShare(); } }, '🔗 URL で共有'),
     h('button', { class: 'menu-item', type: 'button', onclick: () => { closeMenu(); duplicate(); } }, '複製'),
     h('button', { class: 'menu-item', type: 'button', onclick: () => { closeMenu(); openSaveTemplate(); } }, 'テンプレートとして保存'),
     h('a', { class: 'menu-item', href: '#/help/board' }, '📖 使い方'),
@@ -230,6 +232,46 @@ export function render(root, [boardId]) {
     board = null; // 離れる時に保存しないように
     showToast('削除しました');
     location.hash = '#/home';
+  }
+
+  /** URL で共有: 配置を圧縮して URL にする */
+  async function openShare() {
+    scheduleSave.flush();
+    let url;
+    try {
+      url = shareUrl(await encodeShare(toShareData(board, sport, playerOf)));
+    } catch (err) {
+      console.error(err);
+      showToast('共有 URL を作れませんでした', 'error');
+      return;
+    }
+    const field = h('textarea', { class: 'input share-url', rows: 4, readonly: true, 'aria-label': '共有 URL' }, url);
+    const copy = h('button', { class: 'btn btn-primary', type: 'button' }, 'コピー');
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('コピーしました');
+      } catch {
+        field.select();
+        showToast('コピーできませんでした。選択されている URL を手動でコピーしてください', 'error', 4000);
+      }
+    });
+    const footer = [copy];
+    if (navigator.share) {
+      const share = h('button', { class: 'btn', type: 'button' }, '送る (LINE など)');
+      share.addEventListener('click', () => navigator.share({ title: board.name, url }).catch(() => {}));
+      footer.unshift(share);
+    }
+    openModal({
+      title: 'URL で共有',
+      body: h('div', { class: 'form' },
+        h('p', {}, 'この URL を開くと、同じ配置 (選手の位置・敵・ボール・書き込み) が見られます。'),
+        field,
+        h('p', { class: 'note' }, `${url.length}文字。写真・出欠は含まれません。URL を送った後に配置を変えても、送った URL の内容は変わりません。`),
+      ),
+      footer,
+    });
+    field.addEventListener('focus', () => field.select());
   }
 
   function showShortcuts() {

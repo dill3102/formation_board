@@ -35,6 +35,8 @@ const PRECACHE = [
   './js/views/board.js',
   './js/views/settings.js',
   './js/views/help.js',
+  './js/views/view.js',
+  './js/share.js',
   './js/board/viewport.js',
   './js/board/court.js',
   './js/board/pieces.js',
