@@ -1,0 +1,19 @@
+{
+  "id": "futsal",
+  "name": "フットサル",
+  "icon": "🥅",
+  "teamSize": 5,
+  "court": {
+    "aspect": 2.0,
+    "background": "#2c6e9e",
+    "lines": "futsal"
+  },
+  "penColors": ["#ffffff", "#e53935", "#fdd835", "#111111"],
+  "positions": [
+    { "id": "GK", "short": "GK", "name": "ゴレイロ" },
+    { "id": "FX", "short": "FX", "name": "フィクソ" },
+    { "id": "AL", "short": "AL", "name": "アラ" },
+    { "id": "PV", "short": "PV", "name": "ピヴォ" }
+  ],
+  "formations": []
+}

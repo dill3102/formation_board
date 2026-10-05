@@ -1,0 +1,20 @@
+{
+  "id": "basketball",
+  "name": "バスケ",
+  "icon": "🏀",
+  "teamSize": 5,
+  "court": {
+    "aspect": 1.87,
+    "background": "#d8a868",
+    "lines": "basketball"
+  },
+  "penColors": ["#111111", "#e53935", "#1e88e5", "#ffffff"],
+  "positions": [
+    { "id": "PG", "short": "PG", "name": "ポイントガード" },
+    { "id": "SG", "short": "SG", "name": "シューティングガード" },
+    { "id": "SF", "short": "SF", "name": "スモールフォワード" },
+    { "id": "PF", "short": "PF", "name": "パワーフォワード" },
+    { "id": "C", "short": "C", "name": "センター" }
+  ],
+  "formations": []
+}

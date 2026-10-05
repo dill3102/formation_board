@@ -1,7 +1,8 @@
 // スポーツ定義 (data/sports/*.json) の読み込み
 
-// 対応スポーツ (表示順)。M6 で futsal / basketball / volleyball を追加する
-export const SPORT_IDS = ['soccer'];
+// 対応スポーツ (表示順)
+// futsal / basketball / volleyball はポジションのみ定義済み。コート・テンプレートは M6 で追加
+export const SPORT_IDS = ['soccer', 'basketball', 'futsal', 'volleyball'];
 
 const sports = new Map();
 

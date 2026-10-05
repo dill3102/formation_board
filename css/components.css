@@ -77,3 +77,440 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+.btn-small {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.875rem;
+}
+
+.btn-danger-fill {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- ページ上部 ---- */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.page-header h1 {
+  margin: 0;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.toolbar input[type="search"] {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* ---- 入力 ---- */
+.input {
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.input:focus,
+.btn:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.input-number {
+  width: 5em;
+}
+
+.form .field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-sub);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.field-row-top {
+  align-items: flex-start;
+}
+
+.field-row .field-label {
+  width: 5.5em;
+  flex-shrink: 0;
+}
+
+.field-row-top .field-label {
+  padding-top: var(--space-1);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+.field-warning {
+  color: var(--color-warning);
+  font-size: 0.875rem;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.segmented label {
+  cursor: pointer;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented span {
+  display: block;
+  padding: var(--space-2) var(--space-4);
+  border-left: 1px solid var(--color-border);
+}
+
+.segmented label:first-child span {
+  border-left: none;
+}
+
+.segmented input:checked + span {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.segmented input:focus-visible + span {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-weak);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.chip[aria-pressed="true"]::before {
+  content: "✓ ";
+}
+
+.sport-section {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.sport-section legend {
+  padding: 0 var(--space-1);
+  font-weight: 600;
+}
+
+/* ---- 写真 ---- */
+.photo-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.photo-actions .note {
+  width: 100%;
+  margin: 0;
+}
+
+.avatar {
+  --avatar-size: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-primary-weak);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: calc(var(--avatar-size) * 0.42);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cropper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cropper-frame {
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.cropper-canvas {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.cropper-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 240px;
+}
+
+.cropper-zoom input {
+  flex: 1;
+}
+
+/* ---- 選手一覧 ---- */
+.player-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.player-list > li {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.player-row {
+  display: grid;
+  grid-template-columns: auto minmax(6em, 1fr) 2fr 2em;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-2);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.player-row:hover {
+  background: var(--color-bg);
+}
+
+.player-name {
+  font-weight: 600;
+}
+
+.player-sports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: 0.875rem;
+}
+
+.sport-tag {
+  display: inline-flex;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.player-hand {
+  color: var(--color-text-sub);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* ---- モーダル ---- */
+.modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  color: var(--color-text);
+}
+
+.modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.modal-body {
+  flex: 1;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ---- トースト ---- */
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-6);
+  z-index: 1000;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.toast {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius);
+  background: #24292f;
+  color: #fff;
+  box-shadow: var(--shadow);
+  font-size: 0.9rem;
+}
+
+.toast-error {
+  background: var(--color-danger);
+}
+
+@media (max-width: 767px) {
+  .page-header .btn {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .toolbar select {
+    flex: 1;
+  }
+
+  .player-row {
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      "avatar name hand"
+      "avatar sports sports";
+    gap: 0 var(--space-3);
+  }
+
+  .player-row .avatar { grid-area: avatar; }
+  .player-name { grid-area: name; }
+  .player-sports { grid-area: sports; }
+  .player-hand { grid-area: hand; }
+
+  .modal-full {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .modal-footer {
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  }
+
+  .toast-container {
+    bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom) + var(--space-3));
+  }
+}
