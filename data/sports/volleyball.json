@@ -5,7 +5,10 @@
   "teamSize": 6,
   "court": {
     "aspect": 2.0,
+    "size": [18, 9],
     "background": "#e08a3c",
+    "outside": "#2b6cb0",
+    "margin": 0,
     "lines": "volleyball"
   },
   "penColors": ["#111111", "#e53935", "#1e88e5", "#ffffff"],
@@ -16,5 +19,19 @@
     { "id": "OP", "short": "OP", "name": "オポジット" },
     { "id": "L", "short": "L", "name": "リベロ" }
   ],
-  "formations": []
+  "formations": [
+    {
+      "id": "basic",
+      "name": "基本配置",
+      "slots": [
+        { "position": "OH", "x": 0.41, "y": 0.18 },
+        { "position": "MB", "x": 0.41, "y": 0.5 },
+        { "position": "OP", "x": 0.41, "y": 0.82 },
+        { "position": "OH", "x": 0.14, "y": 0.18 },
+        { "position": "MB", "x": 0.22, "y": 0.5 },
+        { "position": "S", "x": 0.14, "y": 0.82 },
+        { "position": "L", "x": 0.06, "y": 0.34 }
+      ]
+    }
+  ]
 }

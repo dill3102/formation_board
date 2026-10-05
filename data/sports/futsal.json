@@ -5,7 +5,8 @@
   "teamSize": 5,
   "court": {
     "aspect": 2.0,
-    "background": "#2c6e9e",
+    "size": [40, 20],
+    "background": "#2f8f6f",
     "lines": "futsal"
   },
   "penColors": ["#ffffff", "#e53935", "#fdd835", "#111111"],
@@ -15,5 +16,28 @@
     { "id": "AL", "short": "AL", "name": "アラ" },
     { "id": "PV", "short": "PV", "name": "ピヴォ" }
   ],
-  "formations": []
+  "formations": [
+    {
+      "id": "1-2-1",
+      "name": "1-2-1 (ダイヤ)",
+      "slots": [
+        { "position": "GK", "x": 0.04, "y": 0.5 },
+        { "position": "FX", "x": 0.17, "y": 0.5 },
+        { "position": "AL", "x": 0.29, "y": 0.2 },
+        { "position": "AL", "x": 0.29, "y": 0.8 },
+        { "position": "PV", "x": 0.42, "y": 0.5 }
+      ]
+    },
+    {
+      "id": "2-2",
+      "name": "2-2 (ボックス)",
+      "slots": [
+        { "position": "GK", "x": 0.04, "y": 0.5 },
+        { "position": "FX", "x": 0.18, "y": 0.3 },
+        { "position": "AL", "x": 0.18, "y": 0.7 },
+        { "position": "AL", "x": 0.37, "y": 0.3 },
+        { "position": "PV", "x": 0.37, "y": 0.7 }
+      ]
+    }
+  ]
 }
