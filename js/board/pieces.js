@@ -27,6 +27,30 @@ export class PieceLayer {
     this.add(id, el, x, y);
   }
 
+  /** 敵マーカー (ポジション名だけ) */
+  addMarker(id, position, x, y) {
+    const el = h('div', { class: 'piece piece-away', dataset: { pieceId: id }, title: `敵 ${position}` },
+      h('span', { class: 'marker' }, position),
+    );
+    this.add(id, el, x, y);
+  }
+
+  /** 画面上の (sx, sy) から radius 以内で一番近いもの。filter で対象を絞る */
+  nearest(sx, sy, radius, filter) {
+    let best = null;
+    let bestDist = radius;
+    for (const [id, item] of this.items) {
+      if (!filter(id)) continue;
+      const p = this.viewport.courtToScreen(item.x, item.y);
+      const d = Math.hypot(p.x - sx, p.y - sy);
+      if (d <= bestDist) {
+        best = id;
+        bestDist = d;
+      }
+    }
+    return best;
+  }
+
   /** 空きのポジション枠 (点線の丸) */
   addSlot(id, position, x, y) {
     const el = h('div', { class: 'slot', dataset: { slotId: id } }, position);

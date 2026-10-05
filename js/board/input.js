@@ -23,7 +23,7 @@ const DRAW_MODES = new Set(['pen', 'arrow', 'eraser']);
  * @param {(id: string) => {x: number, y: number}} handlers.pieceScreenPosition
  * @param {(id: string, x: number, y: number) => void} handlers.onPieceDragStart
  * @param {(id: string, x: number, y: number) => void} handlers.onPieceDrag x, y = 駒の中心の画面座標 (駒のどこを掴んだかは補正済み)
- * @param {(id: string) => void} handlers.onPieceDragEnd
+ * @param {(id: string, x: number, y: number) => void} handlers.onPieceDragEnd x, y = 指を離した位置 (ステージ基準。ステージの外もありうる)
  * @param {(id: string | null) => void} handlers.onTap
  * @param {(x: number, y: number) => void} handlers.onDrawStart
  * @param {(x: number, y: number) => void} handlers.onDrawMove
@@ -52,7 +52,7 @@ export function attachStageInput(stage, handlers) {
 
   /** 1本指の操作を途中で終わらせる (2本目の指が来た時など) */
   function interrupt() {
-    if (gesture?.type === 'piece') handlers.onPieceDragEnd(gesture.id);
+    if (gesture?.type === 'piece') handlers.onPieceDragEnd(gesture.id, gesture.last.x, gesture.last.y);
     if (gesture?.type === 'draw') handlers.onDrawCancel();
   }
 
@@ -96,7 +96,7 @@ export function attachStageInput(stage, handlers) {
     if (gesture.type === 'pending-piece' || gesture.type === 'pending-pan') {
       if (Math.hypot(p.x - gesture.start.x, p.y - gesture.start.y) < gesture.threshold) return;
       if (gesture.type === 'pending-piece') {
-        gesture = { type: 'piece', id: gesture.id, grab: gesture.grab };
+        gesture = { type: 'piece', id: gesture.id, grab: gesture.grab, last: p };
         handlers.onPieceDragStart(gesture.id, p.x + gesture.grab.x, p.y + gesture.grab.y);
       } else {
         gesture = { type: 'pan', last: gesture.start };
@@ -105,6 +105,7 @@ export function attachStageInput(stage, handlers) {
 
     switch (gesture.type) {
       case 'piece':
+        gesture.last = p;
         handlers.onPieceDrag(gesture.id, p.x + gesture.grab.x, p.y + gesture.grab.y);
         break;
       case 'draw':
@@ -142,7 +143,7 @@ export function attachStageInput(stage, handlers) {
     const cancelled = e.type === 'pointercancel';
     if (gesture.type === 'pending-piece' && !cancelled) handlers.onTap(gesture.id);
     else if (gesture.type === 'pending-pan' && !cancelled) handlers.onTap(null);
-    else if (gesture.type === 'piece') handlers.onPieceDragEnd(gesture.id);
+    else if (gesture.type === 'piece') handlers.onPieceDragEnd(gesture.id, gesture.last.x, gesture.last.y);
     else if (gesture.type === 'draw') cancelled ? handlers.onDrawCancel() : handlers.onDrawEnd();
     gesture = null;
   }

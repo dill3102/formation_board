@@ -10,6 +10,8 @@ import { Viewport } from '../js/board/viewport.js';
 import { assignPlayersToSlots } from '../js/board/formation.js';
 import { History } from '../js/board/history.js';
 import { hitStroke, roundPoint, lineWidthPx } from '../js/board/drawing.js';
+import { locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill } from '../js/board/lineup.js';
+import { newBoard, isEmptyBoard, sortBoards } from '../js/models/boards.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -261,6 +263,110 @@ test('hitStroke: 矢印は始点と終点を結ぶ線で判定', () => {
   const arrow = { type: 'arrow', width: 1, points: [[0, 0], [1, 1]] }; // (24,24) → (824,424)
   if (!hitStroke(arrow, 424, 224, v)) throw new Error('中点に当たらない');
   if (hitStroke(arrow, 424, 300, v)) throw new Error('離れているのに当たる');
+});
+
+// --- board/lineup ---
+const lineupHome = () => ({
+  templateId: 't',
+  slots: [
+    { position: 'GK', x: 0.05, y: 0.5, playerId: 'a' },
+    { position: 'DF', x: 0.2, y: 0.3, playerId: 'b' },
+    { position: 'FW', x: 0.4, y: 0.5, playerId: null },
+  ],
+  free: [{ playerId: 'c', x: 0.3, y: 0.7 }],
+  bench: ['d', 'e', 'f'],
+});
+
+test('lineup.locate', () => {
+  const home = lineupHome();
+  assertEqual(locate(home, 'b'), { kind: 'slot', index: 1 });
+  assertEqual(locate(home, 'c'), { kind: 'free', x: 0.3, y: 0.7 });
+  assertEqual(locate(home, 'e'), { kind: 'bench', index: 1 });
+  assertEqual(locate(home, 'z'), null);
+});
+test('lineup.movePlayer: 空き枠へ / 元の枠は空く / 元のデータは変えない', () => {
+  const home = lineupHome();
+  const next = movePlayer(home, 'b', { kind: 'slot', index: 2 });
+  assertEqual(next.slots.map((s) => s.playerId), ['a', null, 'b']);
+  assertEqual(home.slots[1].playerId, 'b');
+});
+test('lineup.movePlayer: 枠の選手同士は入れ替え', () => {
+  const next = movePlayer(lineupHome(), 'a', { kind: 'player', playerId: 'b' });
+  assertEqual(next.slots.map((s) => s.playerId), ['b', 'a', null]);
+});
+test('lineup.movePlayer: ベンチの選手をコートの選手に重ねると交代', () => {
+  const next = movePlayer(lineupHome(), 'e', { kind: 'player', playerId: 'a' });
+  assertEqual(next.slots[0].playerId, 'e');
+  assertEqual(next.bench, ['d', 'a', 'f']);
+});
+test('lineup.movePlayer: 自由配置の選手と枠の選手の入れ替え (位置も交換)', () => {
+  const next = movePlayer(lineupHome(), 'c', { kind: 'player', playerId: 'b' });
+  assertEqual(next.slots[1].playerId, 'c');
+  assertEqual(next.free, [{ playerId: 'b', x: 0.3, y: 0.7 }]);
+});
+test('lineup.movePlayer: 一覧から来た選手に場所を取られた選手は未配置に', () => {
+  const next = movePlayer(lineupHome(), 'new', { kind: 'player', playerId: 'a' });
+  assertEqual(next.slots[0].playerId, 'new');
+  assertEqual(locate(next, 'a'), null);
+});
+test('lineup.movePlayer: ベンチ内の並べ替え・入れ替え', () => {
+  assertEqual(movePlayer(lineupHome(), 'd', { kind: 'bench', index: 2 }).bench, ['e', 'd', 'f']);
+  assertEqual(movePlayer(lineupHome(), 'd', { kind: 'player', playerId: 'f' }).bench, ['f', 'e', 'd']);
+});
+test('lineup.movePlayer: コートからベンチの末尾へ', () => {
+  const next = movePlayer(lineupHome(), 'a', { kind: 'bench' });
+  assertEqual(next.slots[0].playerId, null);
+  assertEqual(next.bench, ['d', 'e', 'f', 'a']);
+});
+test('lineup.moveSlot / removePlayer', () => {
+  assertEqual(moveSlot(lineupHome(), 1, 0.25, 0.35).slots[1], { position: 'DF', x: 0.25, y: 0.35, playerId: 'b' });
+  const removed = removePlayer(lineupHome(), 'c');
+  assertEqual(removed.free, []);
+});
+test('lineup.applyTemplate: コート上の選手をポジション優先で入れ直し、溢れはベンチへ', () => {
+  const players = [
+    { id: 'a', sports: { soccer: { positions: ['GK'] } } },
+    { id: 'b', sports: { soccer: { positions: ['FW'] } } },
+    { id: 'c', sports: { soccer: { positions: ['DF'] } } },
+  ];
+  const slots = [{ position: 'FW', x: 0.4, y: 0.5 }, { position: 'GK', x: 0.05, y: 0.5 }];
+  const next = applyTemplate(lineupHome(), 'soccer:x', slots, players, 'soccer');
+  assertEqual(next.slots.map((s) => s.playerId), ['b', 'a']);
+  assertEqual(next.free, []);
+  assertEqual(next.bench, ['c', 'd', 'e', 'f']);
+  assertEqual(next.templateId, 'soccer:x');
+});
+test('lineup.applyTemplate: なし → 枠の選手はその位置の自由配置に', () => {
+  const next = applyTemplate(lineupHome(), null, null, [], 'soccer');
+  assertEqual(next.slots, []);
+  assertEqual(next.free.map((f) => f.playerId), ['c', 'a', 'b']);
+  assertEqual(next.templateId, null);
+});
+test('lineup.autoFill: 空き枠だけ、まだ置かれていない選手で埋める', () => {
+  const candidates = [
+    { id: 'd', sports: { soccer: { positions: ['FW'] } } }, // ベンチにいるので使わない
+    { id: 'x', sports: { soccer: { positions: ['MF'] } } },
+    { id: 'y', sports: { soccer: { positions: ['FW'] } } },
+  ];
+  assertEqual(autoFill(lineupHome(), candidates, 'soccer').slots.map((s) => s.playerId), ['a', 'b', 'y']);
+});
+
+// --- models/boards ---
+test('boards: 新しい配置は空 / 何か置くと空ではない', () => {
+  const board = newBoard({ id: 'soccer', name: 'サッカー' }, '2026-10-12');
+  assertEqual(board.name, '10/12 サッカー');
+  assertEqual(isEmptyBoard(board), true);
+  assertEqual(isEmptyBoard({ ...board, drawings: [{}] }), false);
+  assertEqual(isEmptyBoard({ ...board, away: { templateId: null, markers: [{}] } }), false);
+  assertEqual(isEmptyBoard({ ...board, home: { ...board.home, bench: ['a'] } }), false);
+});
+test('boards: 新しい順 (日付 → 更新日時)', () => {
+  const list = [
+    { id: '1', date: '2026-10-01', updatedAt: '2' },
+    { id: '2', date: '2026-10-12', updatedAt: '1' },
+    { id: '3', date: '2026-10-12', updatedAt: '3' },
+  ];
+  assertEqual(sortBoards(list).map((b) => b.id), ['3', '2', '1']);
 });
 
 // --- 実行 ---

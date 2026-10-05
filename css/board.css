@@ -13,25 +13,127 @@ body[data-route="board"] .app-main {
   height: 100%;
 }
 
-.board-topbar {
+/* ---- ヘッダー (名前・日付・テンプレート・メニュー) ---- */
+.board-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-3);
-  padding: var(--space-2) var(--space-4);
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-1) var(--space-3);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
 
-.board-topbar h1 {
-  margin: 0;
-  font-size: 1rem;
+.board-title-row {
+  display: flex;
+  flex: 1 1 360px;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.board-note {
-  margin: 0;
+.back-link {
+  font-size: 1.5rem;
+  text-decoration: none;
+  color: var(--color-text-sub);
+}
+
+.board-sport {
+  font-size: 1.2rem;
+}
+
+.board-name {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+.board-name:hover {
+  border-color: var(--color-border);
+}
+
+.save-status {
   color: var(--color-text-sub);
   font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.board-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.board-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--color-text-sub);
+  white-space: nowrap;
+}
+
+.board-field .input {
+  min-height: 34px;
+  padding: 2px var(--space-2);
+  font-size: 0.875rem;
+}
+
+/* ⋮ メニュー */
+.menu-wrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu-item {
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--color-bg);
+}
+
+.menu-danger {
+  color: var(--color-danger);
+}
+
+/* ---- 本体: 左に選手一覧、右にコート + ベンチ ---- */
+.board-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.board-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .board-stage {
@@ -281,6 +383,324 @@ body[data-route="board"] .app-main {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
+/* 敵マーカー */
+.marker,
+.marker-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #e53935;
+  color: #fff;
+  font-weight: 700;
+}
+
+.piece-away .marker {
+  width: 100%;
+  height: 100%;
+  border: 2px solid #fff;
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.piece-away.is-selected .marker {
+  border-color: #fdd835;
+  box-shadow: 0 0 0 3px rgba(253, 216, 53, 0.6), 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+
+.marker-dot {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  font-size: 12px;
+}
+
+/* ---- 選手詳細カード ---- */
+.detail-card {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 25;
+  width: 260px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  cursor: default;
+}
+
+.detail-card[hidden] {
+  display: none;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.detail-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.detail-rows dt {
+  color: var(--color-text-sub);
+}
+
+.detail-rows dd {
+  margin: 0;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* ---- ベンチ ---- */
+.bench {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 60px;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+}
+
+.bench-label {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-sub);
+}
+
+.bench-list {
+  display: flex;
+  flex: 1;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding: 2px 0;
+}
+
+.bench-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 56px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: grab;
+  touch-action: pan-x;
+}
+
+.bench-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bench-empty {
+  color: var(--color-text-sub);
+  font-size: 0.8rem;
+}
+
+/* ---- 選手一覧パネル ---- */
+.board-panel {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 240px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.panel-toggle {
+  display: none;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-3);
+}
+
+.panel-section {
+  margin-bottom: var(--space-4);
+}
+
+.panel-section h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 0.9rem;
+}
+
+.panel-section summary {
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.panel-heading h2 {
+  margin: 0;
+}
+
+.segmented-small span {
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+}
+
+.panel-autofill {
+  width: 100%;
+  margin-bottom: var(--space-2);
+}
+
+.panel-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-player {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "avatar name where" "avatar pos where";
+  align-items: center;
+  gap: 0 var(--space-2);
+  width: 100%;
+  padding: var(--space-1);
+  border: none;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+.panel-player:hover {
+  background: var(--color-bg);
+}
+
+.panel-player .avatar {
+  grid-area: avatar;
+}
+
+.panel-player-name {
+  grid-area: name;
+  overflow: hidden;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.panel-player-pos {
+  grid-area: pos;
+  color: var(--color-text-sub);
+  font-size: 0.75rem;
+}
+
+.panel-player-where {
+  grid-area: where;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-text-sub);
+  font-size: 0.7rem;
+}
+
+.panel-player.is-placed {
+  opacity: 0.55;
+}
+
+.panel-unregistered {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.panel-unregistered .panel-player-name {
+  flex: 1;
+}
+
+.panel-empty {
+  padding: var(--space-2) 0;
+}
+
+.marker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.marker-chip {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e53935;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--color-border);
+  cursor: grab;
+  touch-action: pan-y;
+}
+
+/* ドラッグ中の見た目 */
+.drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.drag-ghost .avatar {
+  border: 2px solid #fff;
+  background: #1f6feb;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.drag-ghost .marker {
+  width: 44px;
+  height: 44px;
+  border: 2px solid #fff;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.is-drag-source {
+  opacity: 0.3;
+}
+
 /* ---- 表示コントロール ---- */
 .zoom-controls {
   position: absolute;
@@ -320,7 +740,86 @@ body[data-route="board"] .app-main {
   font-variant-numeric: tabular-nums;
 }
 
+/* 横幅が足りない時はツール名を隠してアイコンだけに (ツールバーを1行に収める) */
+@media (max-width: 1100px) {
+  .tool-label {
+    display: none;
+  }
+}
+
 @media (max-width: 767px) {
+  /* ボード画面ではアプリのヘッダー (タイトル) を畳んで、コートを広く
+     ※ タブバー (.app-nav) はヘッダーの中にあるので、ヘッダー自体は消さない */
+  body[data-route="board"] .app-header {
+    height: 0;
+    padding: 0;
+    border: none;
+  }
+
+  body[data-route="board"] .app-title {
+    display: none;
+  }
+
+  .board-title-row {
+    flex-basis: 100%;
+  }
+
+  .board-settings {
+    flex-wrap: nowrap;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .board-field .input {
+    max-width: 130px;
+  }
+
+  .detail-card {
+    top: var(--space-2);
+    left: var(--space-2);
+    right: var(--space-2);
+    width: auto;
+  }
+
+  /* 選手一覧は下から引き出すドロワー */
+  .board-body {
+    position: relative;
+    flex-direction: column-reverse;
+  }
+
+  .board-panel {
+    width: 100%;
+    max-height: 44px;
+    border-right: none;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .board-panel.is-open {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-height: 70%;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .panel-toggle {
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    height: 44px;
+    border: none;
+    background: var(--color-surface);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .board-panel:not(.is-open) .panel-body {
+    display: none;
+  }
+
   .board-toolbar {
     flex-wrap: nowrap;
     gap: var(--space-1);
@@ -382,7 +881,7 @@ body[data-route="board"] .app-main {
   }
 
   body[data-route="board"] .app-main {
-    height: calc(100dvh - var(--header-height) - var(--tabbar-height) - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--tabbar-height) - env(safe-area-inset-bottom));
     padding-bottom: 0;
   }
 }

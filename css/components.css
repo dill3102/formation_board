@@ -646,3 +646,62 @@
     min-width: 3.6em;
   }
 }
+
+/* ---- ホーム: 保存済みの配置 ---- */
+.board-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.board-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.board-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3) var(--space-2);
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.board-open:hover {
+  background: var(--color-bg);
+}
+
+.board-row-icon {
+  font-size: 1.6rem;
+}
+
+.board-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.board-row-name {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.board-row-meta {
+  color: var(--color-text-sub);
+  font-size: 0.8rem;
+}
+
+.board-row-actions {
+  display: flex;
+  gap: var(--space-1);
+  padding-right: var(--space-2);
+}
