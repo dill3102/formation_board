@@ -10,7 +10,10 @@ import { Viewport } from '../js/board/viewport.js';
 import { assignPlayersToSlots } from '../js/board/formation.js';
 import { History } from '../js/board/history.js';
 import { hitStroke, roundPoint, lineWidthPx } from '../js/board/drawing.js';
-import { locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill } from '../js/board/lineup.js';
+import {
+  locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill,
+  guestsNeeded, fillWithGuests, pruneGuests, guestAsPlayer,
+} from '../js/board/lineup.js';
 import { newBoard, isEmptyBoard, sortBoards } from '../js/models/boards.js';
 import { applyStatus, applyArrived, countDay, filterByAttendance, describe } from '../js/models/attendance.js';
 
@@ -350,6 +353,31 @@ test('lineup.autoFill: 空き枠だけ、まだ置かれていない選手で埋
     { id: 'y', sports: { soccer: { positions: ['FW'] } } },
   ];
   assertEqual(autoFill(lineupHome(), candidates, 'soccer').slots.map((s) => s.playerId), ['a', 'b', 'y']);
+});
+
+test('lineup.fillWithGuests: 空き枠を仮の選手で埋める (番号は続きから)', () => {
+  let id = 0;
+  const home = { ...lineupHome(), guests: [{ id: 'guest-old', name: '仮2', position: 'MF' }] };
+  home.free.push({ playerId: 'guest-old', x: 0.3, y: 0.3 });
+  const next = fillWithGuests(home, { teamSize: 11, createId: () => `n${++id}` });
+  assertEqual(next.slots[2].playerId, 'guest-n1');
+  assertEqual(next.guests.map((g) => [g.name, g.position]), [['仮2', 'MF'], ['仮3', 'FW']]);
+  assertEqual(guestsNeeded(next, 11), 0);
+});
+test('lineup.fillWithGuests: テンプレートなしなら 1チームの人数まで自由配置で足す', () => {
+  const home = { templateId: null, slots: [], free: [{ playerId: 'a', x: 0.1, y: 0.1 }], bench: [], guests: [] };
+  assertEqual(guestsNeeded(home, 5), 4);
+  let id = 0;
+  const next = fillWithGuests(home, { teamSize: 5, createId: () => `${++id}`, spots: [{ x: 0.2, y: 0.2 }, { x: 0.3, y: 0.3 }] });
+  assertEqual(next.free.length, 5);
+  assertEqual(next.free[1], { playerId: 'guest-1', x: 0.2, y: 0.2 });
+  assertEqual(next.guests.map((g) => g.name), ['仮1', '仮2', '仮3', '仮4']);
+});
+test('lineup.pruneGuests: 配置から外れた仮の選手は消える', () => {
+  const home = { ...lineupHome(), guests: [{ id: 'g1', name: '仮1', position: 'FW' }, { id: 'g2', name: '仮2', position: 'GK' }] };
+  home.slots[2].playerId = 'g1';
+  assertEqual(pruneGuests(home).guests.map((g) => g.id), ['g1']);
+  assertEqual(guestAsPlayer(home.guests[0], 'soccer').sports.soccer.positions, ['FW']);
 });
 
 // --- models/boards ---

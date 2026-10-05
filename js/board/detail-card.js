@@ -45,11 +45,14 @@ export function createDetailCard() {
         .map((id) => sport.positions.find((p) => p.id === id)?.name ?? id)
         .join('、') || '未設定';
       const title = `${info.number ? `#${info.number} ` : ''}${player.name}`;
-      frame(title, [
-        ['ポジション', positions],
-        ['利き', handednessLabel(player.handedness) || '未設定'],
-        [formatShort(date), describe(attendance)],
-      ], actions, createAvatar(player, { sportId: sport.id, size: 36 }));
+      const rows = player.guest
+        ? [['ポジション', positions], ['', '仮の選手 (この配置の中だけ。外すと消えます)']]
+        : [
+          ['ポジション', positions],
+          ['利き', handednessLabel(player.handedness) || '未設定'],
+          [formatShort(date), describe(attendance)],
+        ];
+      frame(title, rows, actions, createAvatar(player, { sportId: sport.id, size: 36 }));
     },
     /** @param {{ position: string }} marker */
     showMarker({ marker, sport, actions }) {

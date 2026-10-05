@@ -28,6 +28,7 @@ import { makeDraggable } from '../board/drag-ghost.js';
 import { shortcutTable } from './help.js';
 import {
   locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill, placedPlayers,
+  guestsNeeded, fillWithGuests, pruneGuests, guestAsPlayer,
 } from '../board/lineup.js';
 
 const ZOOM_STEP = 1.25;
@@ -113,8 +114,17 @@ export function render(root, [boardId]) {
   }
   const scheduleSave = debounce(saveNow, SAVE_DELAY);
 
+  /** 選手を ID で探す (選手名簿 → この配置の仮の選手) */
+  function playerOf(id) {
+    const player = playersById.get(id);
+    if (player) return player;
+    const guest = board.home.guests?.find((g) => g.id === id);
+    return guest ? guestAsPlayer(guest, sport.id) : null;
+  }
+
   /** データを変えたら呼ぶ: 画面を更新して自動保存を予約 */
   function commit() {
+    board.home = pruneGuests(board.home);
     saveStatus.textContent = '保存中…';
     scheduleSave();
     renderAll();
@@ -161,7 +171,8 @@ export function render(root, [boardId]) {
   homeSelect.addEventListener('change', () => {
     const templateId = homeSelect.value || null;
     record();
-    board.home = applyTemplate(board.home, templateId, getTemplateSlots(templateId, sport), players, sport.id);
+    const guests = (board.home.guests ?? []).map((g) => guestAsPlayer(g, sport.id));
+    board.home = applyTemplate(board.home, templateId, getTemplateSlots(templateId, sport), [...players, ...guests], sport.id);
     commit();
   });
   awaySelect.addEventListener('change', () => {
@@ -232,7 +243,7 @@ export function render(root, [boardId]) {
     const homePoints = [
       ...board.home.slots.map(({ position, x, y }) => ({ position, x, y })),
       ...board.home.free.map((f) => ({
-        position: playersById.get(f.playerId)?.sports?.[sport.id]?.positions?.[0] ?? '?', x: f.x, y: f.y,
+        position: playerOf(f.playerId)?.sports?.[sport.id]?.positions?.[0] || '?', x: f.x, y: f.y,
       })),
     ];
     const awayPoints = board.away.markers.map(({ position, x, y }) => ({ position, x, y }));
@@ -367,12 +378,12 @@ export function render(root, [boardId]) {
   function renderPieces() {
     pieces.clear();
     board.home.slots.forEach((slot, i) => {
-      const player = slot.playerId && playersById.get(slot.playerId);
+      const player = slot.playerId && playerOf(slot.playerId);
       if (player) pieces.addPlayer(`p:${player.id}`, player, sport.id, slot.x, slot.y);
       else pieces.addSlot(`s:${i}`, slot.position, slot.x, slot.y);
     });
     for (const f of board.home.free) {
-      const player = playersById.get(f.playerId);
+      const player = playerOf(f.playerId);
       if (player) pieces.addPlayer(`p:${player.id}`, player, sport.id, f.x, f.y);
     }
     for (const m of board.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
@@ -387,9 +398,9 @@ export function render(root, [boardId]) {
   }
 
   function renderBench() {
-    const items = board.home.bench.map((id) => playersById.get(id)).filter(Boolean);
+    const items = board.home.bench.map((id) => playerOf(id)).filter(Boolean);
     benchList.replaceChildren(...items.map((player) => {
-      const item = h('button', { class: 'bench-item', type: 'button', title: player.name, dataset: { playerId: player.id } },
+      const item = h('button', { class: `bench-item${player.guest ? ' is-guest' : ''}`, type: 'button', title: player.name, dataset: { playerId: player.id } },
         createAvatar(player, { sportId: sport.id, size: 36 }),
         h('span', { class: 'bench-name' }, player.name),
       );
@@ -406,6 +417,7 @@ export function render(root, [boardId]) {
     const placed = new Set(placedPlayers(board.home));
     const unregistered = players.filter((p) => !(sport.id in (p.sports ?? {})));
     const hasEmptySlot = board.home.slots.some((s) => !s.playerId);
+    const shortage = guestsNeeded(board.home, sport.teamSize);
 
     panelToggle.textContent = `${panel.classList.contains('is-open') ? '▼' : '▲'} 選手一覧 (${visible.length}人)`;
 
@@ -472,6 +484,10 @@ export function render(root, [boardId]) {
         h('div', { class: 'panel-heading' }, h('h2', {}, '自チーム'), filterButtons),
         hasEmptySlot && h('button', { class: 'btn btn-small panel-autofill', type: 'button', onclick: autoFillSlots },
           '空き枠をおまかせで埋める'),
+        shortage > 0 && h('button', {
+          class: 'btn btn-small panel-autofill', type: 'button', onclick: fillShortage,
+          title: 'その配置の中だけの「仮の選手」を置きます (選手名簿には追加されません)',
+        }, `足りない${shortage}人を仮の選手で埋める`),
         list,
       ),
       unregisteredList,
@@ -499,6 +515,16 @@ export function render(root, [boardId]) {
   function refreshPlayers() {
     players = listPlayers();
     playersById = new Map(players.map((p) => [p.id, p]));
+  }
+
+  /** 足りない人数を仮の選手で埋める */
+  function fillShortage() {
+    const need = guestsNeeded(board.home, sport.teamSize);
+    if (need === 0) return;
+    record();
+    board.home = fillWithGuests(board.home, { teamSize: sport.teamSize, createId, spots: openSpots(need) });
+    commit();
+    showToast(`仮の選手を${need}人置きました (外すと消えます)`);
   }
 
   function autoFillSlots() {
@@ -769,12 +795,22 @@ export function render(root, [boardId]) {
 
   /** 自陣で、他の選手と重ならない場所 */
   function openSpot() {
-    const taken = [...pieces.items.values()];
-    for (let i = 0; i < 30; i++) {
+    return openSpots(1)[0];
+  }
+
+  /** 自陣で、他の選手とも互いにも重ならない場所を count 個 */
+  function openSpots(count) {
+    const taken = [...pieces.items.values()].map(({ x, y }) => ({ x, y }));
+    const result = [];
+    for (let i = 0; i < 30 && result.length < count; i++) {
       const spot = { x: 0.2 + (i % 5) * 0.06, y: 0.2 + Math.floor(i / 5) * 0.12 };
-      if (!taken.some((t) => Math.hypot(t.x - spot.x, (t.y - spot.y) / 2) < 0.04)) return spot;
+      if (!taken.some((t) => Math.hypot(t.x - spot.x, (t.y - spot.y) / 2) < 0.04)) {
+        result.push(spot);
+        taken.push(spot);
+      }
     }
-    return { x: 0.25, y: 0.5 };
+    while (result.length < count) result.push({ x: 0.25, y: 0.5 });
+    return result;
   }
 
   function showPlayerCard(player, actions) {
@@ -832,7 +868,7 @@ export function render(root, [boardId]) {
     if (!id) {
       detailCard.hide();
     } else if (id.startsWith('p:')) {
-      const player = playersById.get(id.slice(2));
+      const player = playerOf(id.slice(2));
       if (player) showPlayerCard(player, playerActions(player));
     } else if (id.startsWith('m:')) {
       const marker = markerById(id.slice(2));
@@ -866,7 +902,7 @@ export function render(root, [boardId]) {
       pieces.select(id);
       pieces.setDragging(id, true);
       if (id.startsWith('p:')) {
-        const player = playersById.get(id.slice(2));
+        const player = playerOf(id.slice(2));
         if (player) showPlayerCard(player, null);
       } else {
         detailCard.hide();

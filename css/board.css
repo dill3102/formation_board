@@ -958,3 +958,11 @@ body.board-maximized .detail-card {
 .piece-ball.is-dragging {
   z-index: 11;
 }
+
+/* ---- 仮の選手 (人数が足りない時の穴埋め) ---- */
+.piece.is-guest .avatar,
+.bench-item.is-guest .avatar {
+  border-style: dashed;
+  background: #6e7781;
+  color: #fff;
+}

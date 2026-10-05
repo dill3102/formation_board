@@ -125,6 +125,64 @@ export function applyTemplate(home, templateId, slots, players, sportId) {
   return next;
 }
 
+// ---- 仮の選手 (人数が足りない時の穴埋め) ----
+// home.guests = [{ id: "guest-...", name: "仮1", position: "FW" }]
+// その配置の中だけの選手 (選手名簿には入らない)。配置から外れたら消す (pruneGuests)
+
+/** 足りない人数: テンプレートがあれば空き枠の数、無ければ 1チームの人数 - コート上の人数 */
+export function guestsNeeded(home, teamSize) {
+  if (home.slots.length > 0) return home.slots.filter((s) => !s.playerId).length;
+  return Math.max(0, teamSize - playersOnCourt(home).length);
+}
+
+/**
+ * 足りない人数を仮の選手で埋める
+ * @param {object} options
+ * @param {number} options.teamSize
+ * @param {() => string} options.createId
+ * @param {{ x: number, y: number }[]} [options.spots] テンプレートが無い時に置く場所 (足りない人数分)
+ */
+export function fillWithGuests(home, { teamSize, createId, spots = [] }) {
+  const next = clone(home);
+  next.guests = next.guests ?? [];
+  let n = Math.max(0, ...next.guests.map((g) => Number(g.name.replace(/\D/g, '')) || 0));
+  const make = (position) => {
+    const guest = { id: `guest-${createId()}`, name: `仮${++n}`, position };
+    next.guests.push(guest);
+    return guest.id;
+  };
+  if (next.slots.length > 0) {
+    for (const slot of next.slots) if (!slot.playerId) slot.playerId = make(slot.position);
+  } else {
+    const need = guestsNeeded(home, teamSize);
+    for (let i = 0; i < need; i++) {
+      const spot = spots[i] ?? { x: 0.25, y: 0.5 };
+      next.free.push({ playerId: make(''), x: spot.x, y: spot.y });
+    }
+  }
+  return next;
+}
+
+/** 配置から外れた仮の選手を消す */
+export function pruneGuests(home) {
+  if (!home.guests?.length) return home;
+  const placed = new Set(placedPlayers(home));
+  const guests = home.guests.filter((g) => placed.has(g.id));
+  return guests.length === home.guests.length ? home : { ...home, guests };
+}
+
+/** 仮の選手を、画面で選手と同じように扱える形にする */
+export function guestAsPlayer(guest, sportId) {
+  return {
+    id: guest.id,
+    name: guest.name,
+    handedness: null,
+    hasPhoto: false,
+    guest: true,
+    sports: { [sportId]: { number: '', positions: guest.position ? [guest.position] : [] } },
+  };
+}
+
 /** 空き枠を候補の選手で埋める (おまかせ配置)。既にコート・ベンチにいる選手は使わない */
 export function autoFill(home, candidates, sportId) {
   const next = clone(home);

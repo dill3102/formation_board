@@ -21,7 +21,7 @@ export class PieceLayer {
 
   /** 選手アイコンを追加。id はコート上で一意 (選手ID) */
   addPlayer(id, player, sportId, x, y) {
-    const el = h('div', { class: 'piece', dataset: { pieceId: id }, title: player.name },
+    const el = h('div', { class: `piece${player.guest ? ' is-guest' : ''}`, dataset: { pieceId: id }, title: player.guest ? `${player.name} (仮の選手)` : player.name },
       createAvatar(player, { sportId, size: PIECE_SIZE }),
       h('span', { class: 'piece-label' }, player.name),
     );
