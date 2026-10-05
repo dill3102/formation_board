@@ -6,7 +6,7 @@
 - HTML / CSS / JavaScript のみ (ビルドなし・外部ライブラリなし)
 - データはブラウザ内 (localStorage) に保存。サーバーには送らない
 - PWA: ホーム画面に追加してアプリのように使える (オフラインでも起動)
-- 企画資料: https://github.com/dill3102/sport_positions_docs
+- 企画資料: https://github.com/dill3102/formation_board_docs
 
 ## できること
 
@@ -32,7 +32,7 @@ python3 -m http.server 8000
 ## 公開 (GitHub Pages)
 
 リポジトリの Settings → Pages で「Deploy from a branch」「main / (root)」を選ぶ。
-→ `https://dill3102.github.io/sport_positions/`
+→ `https://dill3102.github.io/formation_board/`
 
 ## ファイル構成
 
