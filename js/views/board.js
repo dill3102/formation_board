@@ -4,6 +4,7 @@
 import { h } from '../util/dom.js';
 import { createId } from '../util/id.js';
 import { debounce } from '../util/debounce.js';
+import { formatShort } from '../util/date.js';
 import * as storage from '../storage.js';
 import { KEYS, StorageFullError } from '../storage.js';
 import { getSport } from '../sports.js';
@@ -146,11 +147,11 @@ export function render(root, [boardId]) {
     for (const [select, value] of [[homeSelect, board.home.templateId], [awaySelect, board.away.templateId]]) {
       const builtIn = templates.filter((t) => !t.mine);
       const mine = templates.filter((t) => t.mine);
-      select.replaceChildren(
+      select.replaceChildren(...[
         h('option', { value: '' }, 'なし'),
         builtIn.length > 0 && h('optgroup', { label: '定番' }, builtIn.map((t) => h('option', { value: t.id }, t.name))),
         mine.length > 0 && h('optgroup', { label: 'マイテンプレート' }, mine.map((t) => h('option', { value: t.id }, t.name))),
-      );
+      ].filter(Boolean));
       // 使っていたテンプレートが削除されていたら「なし」と表示
       select.value = templates.some((t) => t.id === value) ? value : '';
     }
@@ -419,9 +420,10 @@ export function render(root, [boardId]) {
       return item;
     }));
     if (visible.length === 0) {
-      list.append(h('li', { class: 'note panel-empty' }, all.length === 0
-        ? `${sport.name}に登録された選手がいません。下の「未登録」から追加できます`
-        : '条件に合う選手がいません'));
+      let message = '条件に合う選手がいません';
+      if (all.length === 0) message = `${sport.name}に登録された選手がいません。下の「未登録」から追加できます`;
+      else if (Object.keys(day).length === 0) message = `${formatShort(board.date)} の出欠が未登録です。「出欠」タブで登録すると絞り込めます`;
+      list.append(h('li', { class: 'note panel-empty' }, message));
     }
 
     const unregisteredList = h('details', { class: 'panel-section' },

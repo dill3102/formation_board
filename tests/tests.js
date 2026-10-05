@@ -12,6 +12,7 @@ import { History } from '../js/board/history.js';
 import { hitStroke, roundPoint, lineWidthPx } from '../js/board/drawing.js';
 import { locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill } from '../js/board/lineup.js';
 import { newBoard, isEmptyBoard, sortBoards } from '../js/models/boards.js';
+import { applyStatus, applyArrived, countDay, filterByAttendance, describe } from '../js/models/attendance.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -367,6 +368,38 @@ test('boards: 新しい順 (日付 → 更新日時)', () => {
     { id: '3', date: '2026-10-12', updatedAt: '3' },
   ];
   assertEqual(sortBoards(list).map((b) => b.id), ['3', '2', '1']);
+});
+
+// --- models/attendance ---
+const D = '2026-10-12';
+test('attendance.applyStatus: まとめて登録・未入力に戻すと日付ごと消える', () => {
+  let att = applyStatus({}, D, ['a', 'b'], 'yes');
+  assertEqual(att, { [D]: { a: { status: 'yes', arrived: false }, b: { status: 'yes', arrived: false } } });
+  att = applyStatus(att, D, ['b'], 'no');
+  assertEqual(att[D].b, { status: 'no' });
+  att = applyStatus(att, D, ['a', 'b'], null);
+  assertEqual(att, {});
+});
+test('attendance.applyStatus: 参加のまま再登録しても現着は消えない / 参加以外にすると現着は消える', () => {
+  let att = applyArrived({}, D, 'a', true, new Date('2026-10-12T00:00:00Z'));
+  att = applyStatus(att, D, ['a'], 'yes');
+  assertEqual(att[D].a.arrived, true);
+  att = applyStatus(att, D, ['a'], 'maybe');
+  assertEqual(att[D].a, { status: 'maybe' });
+});
+test('attendance.applyArrived: 未入力の選手を現着にすると参加になる / 戻すと未着', () => {
+  let att = applyArrived({}, D, 'a', true, new Date('2026-10-12T00:45:00Z'));
+  assertEqual(att[D].a, { status: 'yes', arrived: true, arrivedAt: '2026-10-12T00:45:00.000Z' });
+  att = applyArrived(att, D, 'a', false);
+  assertEqual(att[D].a, { status: 'yes', arrived: false });
+});
+test('attendance.countDay / filterByAttendance / describe', () => {
+  const day = { a: { status: 'yes', arrived: true }, b: { status: 'yes', arrived: false }, c: { status: 'no' }, d: { status: 'maybe' } };
+  const ps = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }));
+  assertEqual(countDay(day, ps), { yes: 2, no: 1, maybe: 1, none: 1, arrived: 1 });
+  assertEqual(filterByAttendance(ps, day, 'yes').map((p) => p.id), ['a', 'b']);
+  assertEqual(filterByAttendance(ps, day, 'arrived').map((p) => p.id), ['a']);
+  assertEqual([describe(day.a), describe(day.b), describe(day.c), describe(undefined)], ['参加 / ✓現着', '参加 / 未着', '不参加', '未入力']);
 });
 
 // --- 実行 ---

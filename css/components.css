@@ -705,3 +705,266 @@
   gap: var(--space-1);
   padding-right: var(--space-2);
 }
+
+/* ---- カレンダー ---- */
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.calendar-title {
+  font-weight: 700;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-weekday {
+  padding: var(--space-1) 0;
+  color: var(--color-text-sub);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.calendar-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.calendar-day:hover {
+  background: var(--color-bg);
+}
+
+.is-sun { color: #cf222e; }
+.is-sat { color: #0969da; }
+
+.calendar-day.is-outside {
+  opacity: 0.35;
+}
+
+.calendar-day.is-today {
+  border-color: var(--color-primary);
+  font-weight: 700;
+}
+
+.calendar-day.is-selected {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.calendar-mark {
+  position: absolute;
+  bottom: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.calendar-day.is-selected .calendar-mark {
+  background: #fff;
+}
+
+.calendar-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.calendar-mode {
+  display: none;
+}
+
+/* ---- 出欠・現着 ---- */
+.attendance-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.attendance-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.today-badge {
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.75rem;
+}
+
+.attendance-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  font-size: 0.875rem;
+}
+
+.count-arrived {
+  font-weight: 700;
+}
+
+.bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.check-all {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.bulk-count {
+  color: var(--color-text-sub);
+  font-size: 0.8rem;
+}
+
+.bulk-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.attendance-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.attendance-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto 5.5em;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row-check input,
+.check-all input {
+  width: 18px;
+  height: 18px;
+}
+
+.attendance-name {
+  overflow: hidden;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.status-buttons {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.status-button {
+  min-width: 3.6em;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: none;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.status-button:first-child {
+  border-left: none;
+}
+
+.status-button.status-yes[aria-pressed="true"] { background: #1a7f37; color: #fff; }
+.status-button.status-no[aria-pressed="true"] { background: #6e7781; color: #fff; }
+.status-button.status-maybe[aria-pressed="true"] { background: #bf8700; color: #fff; }
+
+.arrived-button {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text-sub);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.arrived-button.is-arrived {
+  border-style: solid;
+  border-color: #1a7f37;
+  background: #dafbe1;
+  color: #1a7f37;
+  font-weight: 700;
+}
+
+.arrived-none {
+  color: var(--color-text-sub);
+  text-align: center;
+}
+
+/* 今日は現着ボタンを大きく (当日用) */
+.attendance.is-today .attendance-row {
+  grid-template-columns: auto auto 1fr auto 7em;
+}
+
+.attendance.is-today .arrived-button {
+  min-height: 44px;
+  font-size: 1rem;
+}
+
+@media (max-width: 767px) {
+  .attendance-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .calendar-mode {
+    display: inline-flex;
+  }
+
+  .attendance-row,
+  .attendance.is-today .attendance-row {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas:
+      "check avatar name arrived"
+      "check avatar status status";
+  }
+
+  .attendance-row .row-check { grid-area: check; }
+  .attendance-row .avatar { grid-area: avatar; }
+  .attendance-name { grid-area: name; }
+  .status-buttons { grid-area: status; justify-self: start; }
+  .arrived-button,
+  .arrived-none { grid-area: arrived; }
+}

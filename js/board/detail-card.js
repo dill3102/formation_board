@@ -15,7 +15,7 @@ export function createDetailCard() {
   }
 
   function frame(title, rows, actions, leading = null) {
-    el.replaceChildren(
+    el.replaceChildren(...[
       h('div', { class: 'detail-head' },
         leading,
         h('strong', { class: 'detail-title' }, title),
@@ -24,7 +24,7 @@ export function createDetailCard() {
       h('dl', { class: 'detail-rows' }, rows.flatMap(([k, v]) => [h('dt', {}, k), h('dd', {}, v)])),
       actions?.length > 0 && h('div', { class: 'detail-actions' },
         actions.map((a) => h('button', { class: 'btn btn-small', type: 'button', onclick: a.onClick }, a.label))),
-    );
+    ].filter(Boolean));
     el.hidden = false;
   }
 
