@@ -24,7 +24,8 @@ export const SHORTCUTS = [
 export function shortcutTable() {
   return h('table', { class: 'help-table' },
     h('tbody', {}, SHORTCUTS.map(([key, desc]) => h('tr', {},
-      h('th', {}, key.split(' / ').map((k, i) => [i > 0 && ' / ', h('kbd', {}, k)])),
+      // 入れ子の配列にしない (古い dom.js でも崩れないように)
+      h('th', {}, key.split(' / ').flatMap((k, i) => (i > 0 ? [' / ', h('kbd', {}, k)] : [h('kbd', {}, k)]))),
       h('td', {}, desc),
     ))),
   );

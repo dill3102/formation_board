@@ -1,11 +1,12 @@
 // Service Worker: オフラインでも開けるようにする
 // 方針: ネットワーク優先 → 取れなければキャッシュ
 //   オンラインの時は常に最新のファイルを使う (更新がすぐ反映される)
+//   ブラウザの HTTP キャッシュも毎回サーバーに確認させる (no-cache)。古いファイルと新しいファイルが混ざって動かなくなるのを防ぐ
 //   取れたファイルはキャッシュに入れておき、オフラインの時はそれを返す
 // 起動に必要なファイルはインストール時に先にキャッシュする
 // ※ ファイルを増やしたら PRECACHE に足す。キャッシュの作り直しが必要な時は VERSION を上げる
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `formation-board-${VERSION}`;
 
 const PRECACHE = [
@@ -87,7 +88,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: 'no-cache' })
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();
