@@ -98,14 +98,15 @@ export function render(root, [boardId]) {
   let spaceHeld = false;
 
   // ---- 保存 ----
-  const saveStatus = h('span', { class: 'save-status' }, '✓ 保存済み');
+  // 自動保存なので普段は何も出さない。失敗した時だけ表示する
+  const saveStatus = h('span', { class: 'save-status save-error', role: 'status' });
   let saveFailed = false;
 
   function saveNow() {
     try {
       board = saveBoard(board);
       saveFailed = false;
-      saveStatus.textContent = '✓ 保存済み';
+      saveStatus.textContent = '';
     } catch (err) {
       saveFailed = true;
       saveStatus.textContent = '⚠ 保存できませんでした';
@@ -127,7 +128,6 @@ export function render(root, [boardId]) {
   /** データを変えたら呼ぶ: 画面を更新して自動保存を予約 */
   function commit() {
     board.home = pruneGuests(board.home);
-    saveStatus.textContent = '保存中…';
     scheduleSave();
     renderAll();
   }
@@ -138,7 +138,6 @@ export function render(root, [boardId]) {
   });
   nameInput.addEventListener('input', () => {
     board.name = nameInput.value.trim() || board.name;
-    saveStatus.textContent = '保存中…';
     scheduleSave();
   });
 

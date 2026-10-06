@@ -1010,3 +1010,13 @@ body[data-route="view"] .app-main {
     padding-bottom: 0;
   }
 }
+
+/* 保存の失敗だけ表示 (普段は空) */
+.save-error {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.save-error:empty {
+  display: none;
+}
