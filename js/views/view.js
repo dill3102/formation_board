@@ -15,6 +15,8 @@ import { drawCourt, courtSize } from '../board/court.js';
 import { PieceLayer } from '../board/pieces.js';
 import { attachStageInput } from '../board/input.js';
 import { drawStrokes } from '../board/drawing.js';
+import * as storage from '../storage.js';
+import { KEYS } from '../storage.js';
 
 const ZOOM_STEP = 1.25;
 
@@ -57,6 +59,7 @@ export function render(root, [code]) {
 function showBoard(root, shared, sport) {
   const [courtLength, courtWidth] = courtSize(sport);
   const viewport = new Viewport(courtLength / courtWidth);
+  viewport.orientation = storage.read(KEYS.settings, {}).boardOrientation ?? 'auto';
   const playersById = new Map(shared.players.map((p) => [p.id, p]));
 
   const canvas = h('canvas', { class: 'board-court', 'aria-hidden': 'true' });
@@ -67,6 +70,10 @@ function showBoard(root, shared, sport) {
     zoomLabel,
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '縮小', onclick: () => { viewport.zoomBy(1 / ZOOM_STEP); requestDraw(); } }, '−'),
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '全体表示', title: '全体表示', onclick: () => { viewport.fit(); requestDraw(); } }, '⛶'),
+    h('button', {
+      class: 'zoom-button', type: 'button', 'aria-label': '回転', title: '回転 (横長 ⇔ 縦長・自陣が手前)',
+      onclick: () => { viewport.setOrientation(viewport.portrait ? 'landscape' : 'portrait'); requestDraw(); },
+    }, '⟳'),
   );
   zoomLabel.addEventListener('click', () => { viewport.setZoom(1); requestDraw(); });
   const stage = h('div', { class: 'board-stage', dataset: { mode: 'hand' } }, canvas, pieceContainer, zoomControls);

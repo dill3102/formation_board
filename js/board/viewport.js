@@ -18,6 +18,8 @@ export class Viewport {
     this.width = 0;
     this.height = 0;
     this.portrait = false;
+    /** 'auto' = 画面の形で決める / 'landscape' = 横長 (自陣が左) / 'portrait' = 縦長 (自陣が手前=下) */
+    this.orientation = 'auto';
     this.fitScale = 1; // 全体表示の時の scale (= 100%)
     this.scale = 1; // ワールド 1 あたりの px
     this.offsetX = 0;
@@ -28,13 +30,19 @@ export class Viewport {
   get worldHeight() { return this.portrait ? this.aspect : 1; }
   get zoom() { return this.scale / this.fitScale; }
 
+  /** 向きを指定する (回転ボタン)。変わったら全体表示にし直す */
+  setOrientation(orientation) {
+    this.orientation = orientation;
+    if (this.width > 0 && this.height > 0) this.resize(this.width, this.height);
+  }
+
   /**
-   * ステージの大きさが変わった時に呼ぶ。縦長/横長は画面の形で自動で決める
+   * ステージの大きさが変わった時に呼ぶ。縦長/横長は orientation (auto なら画面の形) で決める
    * @returns {boolean} 向き (縦長/横長) が変わったら true
    */
   resize(width, height) {
     const first = this.width === 0 || this.height === 0;
-    const portrait = height > width;
+    const portrait = this.orientation === 'auto' ? height > width : this.orientation === 'portrait';
     const orientationChanged = !first && portrait !== this.portrait;
     const center = first ? null : this.screenToWorld(this.width / 2, this.height / 2);
     const zoom = this.zoom;

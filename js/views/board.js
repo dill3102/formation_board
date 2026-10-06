@@ -84,6 +84,7 @@ export function render(root, [boardId]) {
   const viewport = new Viewport(courtLength / courtWidth);
   const history = new History();
   const settings = storage.read(KEYS.settings, {});
+  viewport.orientation = settings.boardOrientation ?? 'auto';
 
   let players = listPlayers();
   let playersById = new Map(players.map((p) => [p.id, p]));
@@ -372,8 +373,24 @@ export function render(root, [boardId]) {
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '縮小', onclick: () => zoomStep(1 / ZOOM_STEP) }, '−'),
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '全体表示', title: '全体表示', onclick: fitAll }, '⛶'),
   );
+  const rotateButton = h('button', { class: 'zoom-button', type: 'button', onclick: rotate }, '⟳');
   const maximizeButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setMaximized(!maximized) });
-  zoomControls.append(maximizeButton);
+  zoomControls.append(rotateButton, maximizeButton);
+
+  /** 回転: 横長 (自陣が左) ⇔ 縦長 (自陣が手前=下)。選んだ向きは次に開いた時も使う */
+  function rotate() {
+    const orientation = viewport.portrait ? 'landscape' : 'portrait';
+    viewport.setOrientation(orientation);
+    updateSettings({ boardOrientation: orientation });
+    updateRotateButton();
+    requestDraw();
+  }
+
+  function updateRotateButton() {
+    const label = viewport.portrait ? '横向きにする (自陣が左) (R)' : '縦向きにする (自陣が手前) (R)';
+    rotateButton.setAttribute('aria-label', label);
+    rotateButton.title = label;
+  }
   const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, detailCard.el, zoomControls);
 
   // ---- ベンチ ----
@@ -605,6 +622,7 @@ export function render(root, [boardId]) {
     canvas.width = Math.round(rect.width * dpr);
     canvas.height = Math.round(rect.height * dpr);
     viewport.resize(rect.width, rect.height);
+    updateRotateButton();
     draw();
   }
 
@@ -1061,6 +1079,8 @@ export function render(root, [boardId]) {
       commit();
     } else if (!mod && !e.altKey && e.key.toLowerCase() === 'b') {
       toggleBall();
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 'r') {
+      rotate();
     } else if (e.key === '?') {
       e.preventDefault();
       showShortcuts();

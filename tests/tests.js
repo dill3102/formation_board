@@ -186,6 +186,22 @@ test('viewport: ズームは 50%〜400% で、指定した点は動かない', (
   v.setZoom(0.1);
   assertEqual(v.zoom, 0.5);
 });
+test('viewport: 回転 (横長の画面でも縦長にすると自陣が手前=下)', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448);
+  assertEqual(v.portrait, false);
+  v.setOrientation('portrait');
+  assertEqual(v.portrait, true);
+  const own = v.courtToScreen(0, 0.5);
+  const enemy = v.courtToScreen(1, 0.5);
+  if (!(own.y > enemy.y)) throw new Error('自陣が下になっていない');
+  assertPoint(v.courtToScreen(0.5, 0.5), { x: 424, y: 224 }); // 全体表示で中央
+  v.setOrientation('landscape');
+  assertEqual(v.portrait, false);
+  v.setOrientation('auto');
+  v.resize(448, 848);
+  assertEqual(v.portrait, true);
+});
 test('viewport: パンしてもコートの端は画面中央まで', () => {
   const v = new Viewport(2);
   v.resize(848, 448);
