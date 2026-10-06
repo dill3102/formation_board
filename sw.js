@@ -43,6 +43,8 @@ const PRECACHE = [
   './js/board/input.js',
   './js/board/formation.js',
   './js/board/lineup.js',
+  './js/board/frames.js',
+  './js/board/playback.js',
   './js/board/drawing.js',
   './js/board/history.js',
   './js/board/toolbar.js',

@@ -24,6 +24,10 @@ import { drawStrokes, drawStroke, hitStroke, roundPoint, shapeToStroke, PEN_MIN_
 import { History } from '../board/history.js';
 import { createToolbar } from '../board/toolbar.js';
 import { createDetailCard } from '../board/detail-card.js';
+import {
+  frameCount, positionsAt, setStepPosition, insertFrame, removeFrame, pruneSteps, movesInto,
+} from '../board/frames.js';
+import { createPlayback, SPEEDS, pieceIdOf, frameKeyOf } from '../board/playback.js';
 import { makeDraggable } from '../board/drag-ghost.js';
 import { shortcutTable } from './help.js';
 import { toShareData, encodeShare, shareUrl } from '../share.js';
@@ -45,6 +49,7 @@ const ATTENDANCE_FILTERS = [
 ];
 
 const clampCourt = (v) => Math.min(1 + COURT_MARGIN, Math.max(-COURT_MARGIN, v));
+const FRAME_LOCK_MESSAGE = '選手の出し入れ・ベンチ・敵マーカーの追加は「コマ1」で行ってください';
 
 function updateSettings(change) {
   storage.write(KEYS.settings, { ...storage.read(KEYS.settings, {}), ...change });
@@ -91,6 +96,7 @@ export function render(root, [boardId]) {
   let playersById = new Map(players.map((p) => [p.id, p]));
   let attendanceFilter = settings.boardAttendanceFilter ?? 'all';
   let selectedId = null; // 選択中の駒ID ("p:<選手ID>" / "m:<マーカーID>")
+  let frame = 0; // 表示・編集中のコマ (0 = コマ1 = 配置そのもの)
 
   /** 描いている途中の書き込み */
   let current = null;
@@ -129,6 +135,8 @@ export function render(root, [boardId]) {
   /** データを変えたら呼ぶ: 画面を更新して自動保存を予約 */
   function commit() {
     board.home = pruneGuests(board.home);
+    if (board.steps?.length) board.steps = pruneSteps(board);
+    frame = Math.min(frame, frameCount(board) - 1);
     scheduleSave();
     renderAll();
   }
@@ -442,17 +450,135 @@ export function render(root, [boardId]) {
     panelToggle.textContent = panelToggle.textContent.replace(/^[▲▼]/, open ? '▼' : '▲');
   }
 
+  // ---- コマ送りのバー ----
+  let speedId = settings.animSpeed ?? 'normal';
+  const framePrev = h('button', { class: 'frame-button', type: 'button', 'aria-label': '前のコマ', title: '前のコマ (←)', onclick: () => setFrame(frame - 1) }, '◀');
+  const frameNext = h('button', { class: 'frame-button', type: 'button', 'aria-label': '次のコマ', title: '次のコマ (→)', onclick: () => setFrame(frame + 1) }, '▶');
+  const frameLabel = h('span', { class: 'frame-label', 'aria-live': 'polite' });
+  const frameAdd = h('button', { class: 'frame-button', type: 'button', title: 'このコマの後ろにコマを追加', onclick: addFrame }, '＋', h('span', { class: 'frame-text' }, ' コマ'));
+  const frameDelete = h('button', { class: 'frame-button', type: 'button', 'aria-label': 'このコマを削除', title: 'このコマを削除', onclick: deleteFrame }, '🗑');
+  const framePlay = h('button', { class: 'frame-button frame-play', type: 'button', onclick: togglePlay });
+  const speedSelect = h('select', { class: 'input frame-speed', 'aria-label': '再生の速さ' },
+    SPEEDS.map((s) => h('option', { value: s.id }, s.label)));
+  speedSelect.value = SPEEDS.some((s) => s.id === speedId) ? speedId : 'normal';
+  speedSelect.addEventListener('change', () => {
+    speedId = speedSelect.value;
+    updateSettings({ animSpeed: speedId });
+  });
+  const frameHint = h('span', { class: 'frame-hint' });
+  const frameBar = h('div', { class: 'frame-bar', role: 'group', 'aria-label': 'コマ送り' },
+    h('span', { class: 'frame-title' }, '🎬', h('span', { class: 'frame-text' }, ' コマ')),
+    framePrev, frameLabel, frameNext, frameAdd, frameDelete, framePlay, speedSelect, frameHint,
+  );
+
   root.append(h('div', { class: 'board' },
     header,
     toolbar.el,
     h('div', { class: 'board-body' },
       panel,
-      h('div', { class: 'board-main' }, stage, bench),
+      h('div', { class: 'board-main' }, stage, frameBar, bench),
     ),
   ));
 
   // ---- 表示 ----
   const pieces = new PieceLayer(pieceContainer, viewport);
+
+  const playback = createPlayback({
+    getBoard: () => board,
+    apply: (positions) => {
+      for (const [key, [x, y]] of Object.entries(positions)) pieces.move(pieceIdOf(key), x, y);
+    },
+    onFrame: (index) => {
+      frame = index;
+      updateFrameBar();
+    },
+    onStateChange: (playing) => {
+      updateFrameBar();
+      if (!playing) renderPieces();
+      requestDraw();
+    },
+    getSpeedMs: () => (SPEEDS.find((s) => s.id === speedId) ?? SPEEDS[1]).ms,
+  });
+
+  function setFrame(index) {
+    playback.stop();
+    frame = Math.max(0, Math.min(frameCount(board) - 1, index));
+    renderAll();
+  }
+
+  function addFrame() {
+    playback.stop();
+    record();
+    board.steps = insertFrame(board, frame);
+    frame += 1;
+    commit();
+    if (frameCount(board) === 2) {
+      showToast('コマ2 を追加しました。選手・敵・ボールを動かすと、このコマでの位置になります', 'info', 4500);
+    }
+  }
+
+  function deleteFrame() {
+    if (frame === 0) return;
+    playback.stop();
+    record();
+    board.steps = removeFrame(board, frame);
+    frame = Math.min(frame, frameCount(board) - 1);
+    commit();
+  }
+
+  function togglePlay() {
+    if (playback.playing) {
+      playback.stop();
+      return;
+    }
+    if (frameCount(board) < 2) {
+      showToast('「＋ コマ」でコマを追加すると再生できます');
+      return;
+    }
+    selectedId = null;
+    pieces.select(null);
+    detailCard.hide();
+    playback.play(frame);
+  }
+
+  function updateFrameBar() {
+    const count = frameCount(board);
+    const playing = playback.playing;
+    frameLabel.textContent = `${frame + 1} / ${count}`;
+    framePrev.disabled = frame === 0 || playing;
+    frameNext.disabled = frame >= count - 1 || playing;
+    frameAdd.disabled = playing;
+    frameDelete.disabled = frame === 0 || playing;
+    framePlay.textContent = playing ? '■ 停止' : '▶ 再生';
+    framePlay.setAttribute('aria-label', playing ? '停止' : '再生');
+    framePlay.disabled = count < 2 && !playing;
+    frameHint.textContent = playing ? ''
+      : frame > 0 ? `コマ${frame + 1}: 動かした位置がこのコマの位置になります`
+        : count > 1 ? 'コマ1 = 配置そのもの' : '「＋ コマ」で動きを付けられます';
+    homeSelect.disabled = frame > 0;
+    awaySelect.disabled = frame > 0;
+    stage.classList.toggle('is-step-frame', frame > 0);
+  }
+
+  /** コマ2 以降: 前のコマからの動きを点線で表示 */
+  function drawMoves() {
+    ctx.save();
+    ctx.setLineDash([6, 5]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    for (const [, from, to] of movesInto(board, frame)) {
+      const a = viewport.courtToScreen(from[0], from[1]);
+      const b = viewport.courtToScreen(to[0], to[1]);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(a.x, a.y, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 
   function sportPlayers() {
     return players.filter((p) => sport.id in (p.sports ?? {}));
@@ -460,6 +586,7 @@ export function render(root, [boardId]) {
 
   function renderAll() {
     renderPieces();
+    updateFrameBar();
     renderBench();
     renderPanel();
     renderTemplateOptions();
@@ -481,6 +608,10 @@ export function render(root, [boardId]) {
     for (const m of board.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
     if (board.ball) pieces.addBall('b:ball', board.ball.x, board.ball.y);
     toolbar.setBallState(!!board.ball);
+    // コマ2 以降はそのコマの位置に
+    if (frame > 0) {
+      for (const [key, [x, y]] of Object.entries(positionsAt(board, frame))) pieces.move(pieceIdOf(key), x, y);
+    }
     pieces.layout();
     if (selectedId && !pieces.get(selectedId)) {
       selectedId = null;
@@ -611,6 +742,10 @@ export function render(root, [boardId]) {
 
   /** 足りない人数を仮の選手で埋める */
   function fillShortage() {
+    if (frame > 0) {
+      showToast(FRAME_LOCK_MESSAGE);
+      return;
+    }
     const need = guestsNeeded(board.home, sport.teamSize);
     if (need === 0) return;
     record();
@@ -620,6 +755,10 @@ export function render(root, [boardId]) {
   }
 
   function autoFillSlots() {
+    if (frame > 0) {
+      showToast(FRAME_LOCK_MESSAGE);
+      return;
+    }
     const candidates = filterByAttendance(sportPlayers(), getDay(board.date), attendanceFilter);
     record();
     board.home = autoFill(board.home, candidates, sport.id);
@@ -637,6 +776,7 @@ export function render(root, [boardId]) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (!drawingsHidden) drawStrokes(ctx, board.drawings, viewport);
     if (current) drawStroke(ctx, current, viewport);
+    if (frame > 0 && !playback.playing) drawMoves();
     pieces.layout();
     zoomLabel.textContent = `${Math.round(viewport.zoom * 100)}%`;
   }
@@ -677,7 +817,7 @@ export function render(root, [boardId]) {
 
   // ---- 元に戻す / やり直し ----
   function snapshot() {
-    return { home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings };
+    return { home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings, steps: board.steps ?? [] };
   }
 
   function record() {
@@ -715,6 +855,7 @@ export function render(root, [boardId]) {
   let textStart = null; // テキストツール: 押した位置 (離した時に入力欄を出す)
 
   function startDrawing(sx, sy) {
+    playback.stop();
     // 隠している時に書き始めたら表示に戻す (見えないまま消したり描いたりしないように)
     if (drawingsHidden) setDrawingsHidden(false);
     if (tool.mode === 'eraser') {
@@ -902,6 +1043,10 @@ export function render(root, [boardId]) {
       },
       onDrop: (cx, cy) => {
         detailCard.hide();
+        if (frame > 0) {
+          showToast(FRAME_LOCK_MESSAGE);
+          return;
+        }
         const p = stagePoint(cx, cy);
         const where = locate(board.home, player.id);
         if (p) {
@@ -921,7 +1066,7 @@ export function render(root, [boardId]) {
       onTap: () => {
         selectedId = `p:${player.id}`;
         pieces.select(selectedId);
-        showPlayerCard(player, playerActions(player));
+        showPlayerCard(player, frame > 0 ? [] : playerActions(player));
       },
     });
   }
@@ -995,6 +1140,10 @@ export function render(root, [boardId]) {
   }
 
   function addMarker(position, c) {
+    if (frame > 0) {
+      showToast(FRAME_LOCK_MESSAGE);
+      return;
+    }
     record();
     board.away = {
       ...board.away,
@@ -1034,12 +1183,12 @@ export function render(root, [boardId]) {
       detailCard.hide();
     } else if (id.startsWith('p:')) {
       const player = playerOf(id.slice(2));
-      if (player) showPlayerCard(player, playerActions(player));
+      if (player) showPlayerCard(player, frame > 0 ? [] : playerActions(player));
     } else if (id.startsWith('m:')) {
       const marker = markerById(id.slice(2));
       detailCard.showMarker({
         marker, sport,
-        actions: [{
+        actions: frame > 0 ? [] : [{
           label: '削除',
           onClick: () => {
             record();
@@ -1062,6 +1211,7 @@ export function render(root, [boardId]) {
       return viewport.courtToScreen(item.x, item.y);
     },
     onPieceDragStart: (id) => {
+      playback.stop();
       record();
       selectedId = id;
       pieces.select(id);
@@ -1086,6 +1236,13 @@ export function render(root, [boardId]) {
       const inStage = stagePoint(cx, cy);
       const item = pieces.get(id);
       const center = viewport.courtToScreen(item.x, item.y);
+
+      // コマ2 以降は位置だけ記録 (コートの外に出しても消さない)
+      if (frame > 0) {
+        if (inStage) board.steps = setStepPosition(board, frame, frameKeyOf(id), item.x, item.y);
+        commit();
+        return;
+      }
 
       if (id === 'b:ball') {
         board.ball = inStage ? { x: item.x, y: item.y } : null;
@@ -1171,6 +1328,8 @@ export function render(root, [boardId]) {
       onTapPiece(null);
       closeMenu();
       if (maximized) setMaximized(false);
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && frame > 0 && /^(b:|m:)/.test(selectedId ?? '')) {
+      showToast(FRAME_LOCK_MESSAGE);
     } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId === 'b:ball') {
       record();
       board.ball = null;
@@ -1194,6 +1353,9 @@ export function render(root, [boardId]) {
       setMaximized(!maximized);
     } else if (!mod && !e.altKey && e.key.toLowerCase() === 'w') {
       setDrawingsHidden(!drawingsHidden);
+    } else if (!mod && !e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      setFrame(frame + (e.key === 'ArrowRight' ? 1 : -1));
     } else if (!mod && !e.altKey) {
       toolbar.handleKey(e.key);
     }
@@ -1234,6 +1396,7 @@ export function render(root, [boardId]) {
   return () => {
     observer.disconnect();
     detach();
+    playback.stop();
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('pagehide', onPageHide);

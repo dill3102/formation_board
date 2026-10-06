@@ -23,6 +23,7 @@ export function newBoard(sport, date = todayKey()) {
     away: { templateId: null, markers: [] },
     ball: null,
     drawings: [],
+    steps: [],
     createdAt: now,
     updatedAt: now,
   };

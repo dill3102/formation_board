@@ -65,12 +65,23 @@ export function toShareData(board, sport, playerOf) {
       return row;
     });
   }
+  // コマ送り: 各コマ = [種類, 番号, x, y, …] (種類 0 = h の行 / 1 = 敵マーカー a / 2 = ボール)
+  if (board.steps?.length) {
+    const refs = {};
+    board.home.slots.forEach((s, i) => { if (s.playerId) refs[`p:${s.playerId}`] = [0, i]; });
+    board.home.free.forEach((f, j) => { refs[`p:${f.playerId}`] = [0, board.home.slots.length + j]; });
+    board.away.markers.forEach((m, k) => { refs[`m:${m.id}`] = [1, k]; });
+    refs.b = [2, 0];
+    data.f = board.steps.map((step) => Object.entries(step)
+      .filter(([key]) => refs[key])
+      .flatMap(([key, [x, y]]) => [...refs[key], q(x), q(y)]));
+  }
   return data;
 }
 
 /**
  * 共有データ → 表示用の配置
- * @returns {{ sportId, name, date, players: object[], home: object, away: object, ball, drawings }}
+ * @returns {{ sportId, name, date, players: object[], home: object, away: object, ball, drawings, steps }}
  *   players = 共有された選手 (id は "s0", "s1" …)。home は slots / free / bench (players の id を参照)
  */
 export function fromShareData(data, sport) {
@@ -85,10 +96,17 @@ export function fromShareData(data, sport) {
     return id;
   };
   const home = { templateId: null, slots: [], free: [], bench: [] };
+  const rowKeys = []; // h の行 → コマ送りのキー
   for (const row of data.h) {
     const [name, number, position, x, y] = row;
-    if (name === '' && number === '') home.slots.push({ position, x: uq(x), y: uq(y), playerId: null });
-    else home.free.push({ playerId: addPlayer([name, number, position]), x: uq(x), y: uq(y) });
+    if (name === '' && number === '') {
+      home.slots.push({ position, x: uq(x), y: uq(y), playerId: null });
+      rowKeys.push(null);
+    } else {
+      const id = addPlayer([name, number, position]);
+      home.free.push({ playerId: id, x: uq(x), y: uq(y) });
+      rowKeys.push(`p:${id}`);
+    }
   }
   home.bench = (data.e ?? []).map(addPlayer);
   const away = {
@@ -126,6 +144,15 @@ export function fromShareData(data, sport) {
     away,
     ball: data.b ? { x: uq(data.b[0]), y: uq(data.b[1]) } : null,
     drawings,
+    steps: (data.f ?? []).map((flat) => {
+      const step = {};
+      for (let k = 0; k + 3 < flat.length; k += 4) {
+        const [type, index, x, y] = flat.slice(k, k + 4);
+        const key = type === 0 ? rowKeys[index] : type === 1 ? `m:m${index}` : 'b';
+        if (key) step[key] = [uq(x), uq(y)];
+      }
+      return step;
+    }),
   };
 }
 

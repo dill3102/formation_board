@@ -17,6 +17,9 @@ import {
 import { newBoard, isEmptyBoard, sortBoards } from '../js/models/boards.js';
 import { applyStatus, applyArrived, countDay, filterByAttendance, describe } from '../js/models/attendance.js';
 import { toShareData, fromShareData, encodeShare, decodeShare } from '../js/share.js';
+import {
+  frameCount, positionsAt, setStepPosition, insertFrame, removeFrame, pruneSteps, interpolate, movesInto,
+} from '../js/board/frames.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -485,6 +488,63 @@ test('attendance.countDay / filterByAttendance / describe', () => {
   assertEqual([describe(day.a), describe(day.b), describe(day.c), describe(undefined)], ['参加 / ✓現着', '参加 / 未着', '不参加', '未入力']);
 });
 
+// --- board/frames (コマ送り) ---
+const frameBoard = () => ({
+  home: {
+    slots: [{ position: 'GK', x: 0.05, y: 0.5, playerId: 'a' }, { position: 'FW', x: 0.4, y: 0.5, playerId: null }],
+    free: [{ playerId: 'b', x: 0.3, y: 0.3 }],
+    bench: ['c'],
+  },
+  away: { markers: [{ id: 'm1', position: 'GK', x: 0.95, y: 0.5 }] },
+  ball: { x: 0.5, y: 0.5 },
+  steps: [],
+});
+test('frames: コマ1 = 配置そのもの (空き枠・ベンチは対象外)', () => {
+  const b = frameBoard();
+  assertEqual(frameCount(b), 1);
+  assertEqual(positionsAt(b, 0), { 'p:a': [0.05, 0.5], 'p:b': [0.3, 0.3], 'm:m1': [0.95, 0.5], b: [0.5, 0.5] });
+});
+test('frames: 動かしていない駒は前のコマの位置のまま', () => {
+  const b = frameBoard();
+  b.steps = insertFrame(b, 0); // コマ2
+  b.steps = setStepPosition(b, 1, 'p:b', 0.4, 0.35);
+  b.steps = insertFrame(b, 1); // コマ3
+  b.steps = setStepPosition(b, 2, 'b', 0.6, 0.4);
+  assertEqual(frameCount(b), 3);
+  assertEqual(positionsAt(b, 2)['p:b'], [0.4, 0.35]);
+  assertEqual(positionsAt(b, 2).b, [0.6, 0.4]);
+  assertEqual(positionsAt(b, 1).b, [0.5, 0.5]);
+  assertEqual(movesInto(b, 2), [['b', [0.5, 0.5], [0.6, 0.4]]]);
+});
+test('frames: 前のコマと同じ位置に戻したら記録を消す', () => {
+  const b = frameBoard();
+  b.steps = insertFrame(b, 0);
+  b.steps = setStepPosition(b, 1, 'p:a', 0.1, 0.5);
+  b.steps = setStepPosition(b, 1, 'p:a', 0.05, 0.5);
+  assertEqual(b.steps, [{}]);
+});
+test('frames: コマを消すと、その動きは次のコマに引き継ぐ (後のコマの位置は変わらない)', () => {
+  const b = frameBoard();
+  b.steps = [{ 'p:b': [0.4, 0.3] }, { b: [0.7, 0.5] }];
+  const before = positionsAt(b, 2);
+  b.steps = removeFrame(b, 1);
+  assertEqual(frameCount(b), 2);
+  assertEqual(positionsAt(b, 1), before);
+});
+test('frames: 配置から外れた駒の記録は無視・整理', () => {
+  const b = frameBoard();
+  b.steps = [{ 'p:gone': [0.1, 0.1], 'p:a': [0.2, 0.5] }];
+  assertEqual(Object.keys(positionsAt(b, 1)).includes('p:gone'), false);
+  assertEqual(pruneSteps(b), [{ 'p:a': [0.2, 0.5] }]);
+});
+test('frames: 途中の位置 (ease in-out。半分で真ん中、端はそのまま)', () => {
+  const from = { k: [0, 0] };
+  const to = { k: [1, 0.5] };
+  assertEqual(interpolate(from, to, 0).k, [0, 0]);
+  assertEqual(interpolate(from, to, 0.5).k, [0.5, 0.25]);
+  assertEqual(interpolate(from, to, 1).k, [1, 0.5]);
+});
+
 // --- share ---
 const shareSport = { id: 'soccer', penColors: ['#ffffff', '#e53935', '#1e88e5', '#fdd835'] };
 function shareBoard() {
@@ -562,6 +622,21 @@ test('share: 点線矢印・直線・円・テキストも往復できる', asyn
     { type: 'circle', dashed: undefined, color: '#fdd835', width: 3, points: [[0.7, 0.5], [0.75, 0.5]], text: undefined },
     { type: 'text', dashed: undefined, color: '#e53935', width: 2, points: [[0.4, 0.3]], text: 'ここでパス' },
   ]);
+});
+test('share: コマ送りも往復できる (選手・敵・ボールの ID を付け替え)', async () => {
+  const { board, playerOf } = shareBoard();
+  board.steps = [
+    { 'p:a': [0.5, 0.45], b: [0.6, 0.4] },
+    { 'p:b': [0.35, 0.35], 'm:m': [0.9, 0.45] },
+  ];
+  const shared = fromShareData(await decodeShare(await encodeShare(toShareData(board, shareSport, playerOf))), shareSport);
+  // 共有後の ID: a → s0 (枠の選手)、b → s1 (自由配置)、マーカー m → m0
+  assertEqual(shared.steps, [
+    { 'p:s0': [0.5, 0.45], b: [0.6, 0.4] },
+    { 'p:s1': [0.35, 0.35], 'm:m0': [0.9, 0.45] },
+  ]);
+  assertEqual(frameCount(shared), 3);
+  assertEqual(positionsAt(shared, 2)['p:s0'], [0.5, 0.45]);
 });
 test('share: 壊れた文字列はエラー', async () => {
   let failed = false;

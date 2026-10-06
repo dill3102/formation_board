@@ -15,6 +15,8 @@ import { drawCourt, courtSize } from '../board/court.js';
 import { PieceLayer } from '../board/pieces.js';
 import { attachStageInput } from '../board/input.js';
 import { drawStrokes } from '../board/drawing.js';
+import { frameCount, positionsAt } from '../board/frames.js';
+import { createPlayback, SPEEDS, pieceIdOf } from '../board/playback.js';
 import * as storage from '../storage.js';
 import { KEYS } from '../storage.js';
 
@@ -96,6 +98,22 @@ function showBoard(root, shared, sport) {
       avatarText(p, sport), h('span', { class: 'bench-name' }, p.name)))),
   );
 
+  // ---- コマ送り (コマがある時だけ) ----
+  const count = frameCount(shared);
+  let frame = 0;
+  let speedId = settings.animSpeed ?? 'normal';
+  const framePrev = h('button', { class: 'frame-button', type: 'button', 'aria-label': '前のコマ', onclick: () => showFrame(frame - 1) }, '◀');
+  const frameNext = h('button', { class: 'frame-button', type: 'button', 'aria-label': '次のコマ', onclick: () => showFrame(frame + 1) }, '▶');
+  const frameLabel = h('span', { class: 'frame-label' });
+  const framePlay = h('button', { class: 'frame-button frame-play', type: 'button', onclick: () => (playback.playing ? playback.stop() : playback.play(frame)) });
+  const speedSelect = h('select', { class: 'input frame-speed', 'aria-label': '再生の速さ' }, SPEEDS.map((s) => h('option', { value: s.id }, s.label)));
+  speedSelect.value = SPEEDS.some((s) => s.id === speedId) ? speedId : 'normal';
+  speedSelect.addEventListener('change', () => { speedId = speedSelect.value; });
+  const frameBar = count > 1 && h('div', { class: 'frame-bar', role: 'group', 'aria-label': 'コマ送り' },
+    h('span', { class: 'frame-title' }, '🎬', h('span', { class: 'frame-text' }, ' コマ')),
+    framePrev, frameLabel, frameNext, framePlay, speedSelect,
+  );
+
   const saveButton = h('button', { class: 'btn btn-primary btn-small', type: 'button' }, '自分の配置として保存');
   saveButton.addEventListener('click', () => importBoard(shared, sport));
 
@@ -110,7 +128,7 @@ function showBoard(root, shared, sport) {
       h('div', { class: 'board-settings' }, saveButton),
     ),
     h('div', { class: 'board-body' },
-      h('div', { class: 'board-main' }, stage, bench),
+      h('div', { class: 'board-main' }, stage, frameBar, bench),
     ),
   ));
 
@@ -123,6 +141,33 @@ function showBoard(root, shared, sport) {
   }
   for (const m of shared.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
   if (shared.ball) pieces.addBall('b:ball', shared.ball.x, shared.ball.y);
+
+  const applyPositions = (positions) => {
+    for (const [key, [x, y]] of Object.entries(positions)) pieces.move(pieceIdOf(key), x, y);
+  };
+  const playback = createPlayback({
+    getBoard: () => shared,
+    apply: applyPositions,
+    onFrame: (index) => { frame = index; updateFrameBar(); },
+    onStateChange: () => updateFrameBar(),
+    getSpeedMs: () => (SPEEDS.find((s) => s.id === speedId) ?? SPEEDS[1]).ms,
+  });
+
+  function showFrame(index) {
+    playback.stop();
+    frame = Math.max(0, Math.min(count - 1, index));
+    applyPositions(positionsAt(shared, frame));
+    updateFrameBar();
+  }
+
+  function updateFrameBar() {
+    if (!frameBar) return;
+    frameLabel.textContent = `${frame + 1} / ${count}`;
+    framePrev.disabled = frame === 0 || playback.playing;
+    frameNext.disabled = frame >= count - 1 || playback.playing;
+    framePlay.textContent = playback.playing ? '■ 停止' : '▶ 再生';
+  }
+  updateFrameBar();
 
   // ---- 描画 ----
   const ctx = canvas.getContext('2d');
@@ -177,6 +222,7 @@ function showBoard(root, shared, sport) {
   resize();
 
   return () => {
+    playback.stop();
     observer.disconnect();
     detach();
   };
@@ -218,9 +264,16 @@ function importBoard(shared, sport) {
     bench: shared.home.bench.map((id) => idMap.get(id)),
     guests,
   };
-  board.away = { templateId: null, markers: shared.away.markers.map((m) => ({ ...m, id: createId() })) };
+  const markerIds = new Map(shared.away.markers.map((m) => [m.id, createId()]));
+  board.away = { templateId: null, markers: shared.away.markers.map((m) => ({ ...m, id: markerIds.get(m.id) })) };
   board.ball = shared.ball;
   board.drawings = shared.drawings.map((d) => ({ ...d, id: createId() }));
+  // コマ送り: 共有の ID を自分の配置の ID に付け替える
+  board.steps = (shared.steps ?? []).map((step) => Object.fromEntries(Object.entries(step).map(([key, pos]) => {
+    if (key.startsWith('p:')) return [`p:${idMap.get(key.slice(2))}`, pos];
+    if (key.startsWith('m:')) return [`m:${markerIds.get(key.slice(2))}`, pos];
+    return [key, pos];
+  })));
 
   try {
     const saved = saveBoard(board);

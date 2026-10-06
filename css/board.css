@@ -1108,3 +1108,89 @@ body[data-route="view"] .app-main {
     min-width: 18px;
   }
 }
+
+/* ---- コマ送り (アニメーション) ---- */
+.frame-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  font-size: 0.85rem;
+}
+
+.frame-title {
+  font-weight: 600;
+  color: var(--color-text-sub);
+}
+
+.frame-button {
+  min-width: 34px;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.frame-button:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+.frame-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.frame-play {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.frame-label {
+  min-width: 3.2em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.frame-speed {
+  min-height: 32px;
+  padding: 2px var(--space-2);
+  font-size: 0.8rem;
+}
+
+.frame-hint {
+  color: var(--color-text-sub);
+  font-size: 0.75rem;
+}
+
+/* コマ2 以降を編集中はコートの縁で分かるように */
+.board-stage.is-step-frame {
+  box-shadow: inset 0 0 0 3px rgba(253, 216, 53, 0.8);
+}
+
+@media (max-width: 767px) {
+  .frame-bar {
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .frame-text,
+  .frame-hint {
+    display: none;
+  }
+
+  .frame-button {
+    min-width: 30px;
+    padding: 0 6px;
+  }
+
+  .frame-speed {
+    max-width: 76px;
+  }
+}
