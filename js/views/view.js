@@ -63,6 +63,7 @@ function showBoard(root, shared, sport) {
   viewport.orientation = settings.boardOrientation ?? 'auto';
   viewport.flipped = settings.boardFlipped ?? false;
   const playersById = new Map(shared.players.map((p) => [p.id, p]));
+  let drawingsHidden = false;
 
   const canvas = h('canvas', { class: 'board-court', 'aria-hidden': 'true' });
   const pieceContainer = h('div', { class: 'board-pieces' });
@@ -76,6 +77,10 @@ function showBoard(root, shared, sport) {
       class: 'zoom-button', type: 'button', 'aria-label': '回転', title: '回転 (横長 ⇔ 縦長・自陣が手前)',
       onclick: () => { viewport.setOrientation(viewport.portrait ? 'landscape' : 'portrait'); requestDraw(); },
     }, '⟳'),
+    h('button', {
+      class: 'zoom-button', type: 'button', 'aria-label': '書き込みを隠す / 表示する', title: '書き込みを隠す / 表示する',
+      onclick: (e) => { drawingsHidden = !drawingsHidden; e.currentTarget.classList.toggle('is-off', drawingsHidden); requestDraw(); },
+    }, '👁'),
     h('button', {
       class: 'zoom-button', type: 'button', 'aria-label': '反転', title: '反転 (自陣を反対側に)',
       onclick: () => { viewport.setFlipped(!viewport.flipped); requestDraw(); },
@@ -128,7 +133,7 @@ function showBoard(root, shared, sport) {
     queued = false;
     drawCourt(ctx, sport, viewport, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawStrokes(ctx, shared.drawings, viewport);
+    if (!drawingsHidden) drawStrokes(ctx, shared.drawings, viewport);
     pieces.layout();
     zoomLabel.textContent = `${Math.round(viewport.zoom * 100)}%`;
   }

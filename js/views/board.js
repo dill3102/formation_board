@@ -20,7 +20,7 @@ import { drawCourt, courtSize } from '../board/court.js';
 import { PieceLayer } from '../board/pieces.js';
 import { attachStageInput } from '../board/input.js';
 import { mirrorSlots } from '../board/formation.js';
-import { drawStrokes, drawStroke, hitStroke, roundPoint, PEN_MIN_DISTANCE } from '../board/drawing.js';
+import { drawStrokes, drawStroke, hitStroke, roundPoint, shapeToStroke, PEN_MIN_DISTANCE } from '../board/drawing.js';
 import { History } from '../board/history.js';
 import { createToolbar } from '../board/toolbar.js';
 import { createDetailCard } from '../board/detail-card.js';
@@ -343,6 +343,7 @@ export function render(root, [boardId]) {
   // ---- ツールバー ----
   const tool = {
     mode: 'move',
+    shape: settings.lastShape ?? 'arrow',
     color: sport.penColors.includes(settings.lastPenColor) || settings.lastPenColor?.startsWith('#')
       ? settings.lastPenColor : sport.penColors[1],
     width: settings.lastPenWidth ?? 2,
@@ -352,9 +353,11 @@ export function render(root, [boardId]) {
     initial: tool,
     onChange: (state) => {
       const styleChanged = state.color !== tool.color || state.width !== tool.width;
+      const shapeChanged = state.shape !== tool.shape;
       Object.assign(tool, state);
       updateCursor();
       if (styleChanged) updateSettings({ lastPenColor: tool.color, lastPenWidth: tool.width });
+      if (shapeChanged) updateSettings({ lastShape: tool.shape });
     },
     onUndo: undo,
     onRedo: redo,
@@ -376,7 +379,24 @@ export function render(root, [boardId]) {
   const rotateButton = h('button', { class: 'zoom-button', type: 'button', onclick: rotate }, '⟳');
   const flipButton = h('button', { class: 'zoom-button', type: 'button', onclick: flip }, '⇅');
   const maximizeButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setMaximized(!maximized) });
-  zoomControls.append(rotateButton, flipButton, maximizeButton);
+  const drawingsButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setDrawingsHidden(!drawingsHidden) }, '👁');
+  zoomControls.append(rotateButton, flipButton, drawingsButton, maximizeButton);
+
+  // 書き込みの表示 ON/OFF (配置だけ見たい時)。選んだ状態は次も使う
+  let drawingsHidden = settings.drawingsHidden ?? false;
+  function setDrawingsHidden(hidden) {
+    drawingsHidden = hidden;
+    updateSettings({ drawingsHidden: hidden });
+    updateDrawingsButton();
+    requestDraw();
+  }
+  function updateDrawingsButton() {
+    const label = drawingsHidden ? '書き込みを表示する (W)' : '書き込みを隠す (W)';
+    drawingsButton.setAttribute('aria-label', label);
+    drawingsButton.title = label;
+    drawingsButton.setAttribute('aria-pressed', String(drawingsHidden));
+    drawingsButton.classList.toggle('is-off', drawingsHidden);
+  }
 
   /** 反転 (180度): 自陣を反対側に表示する。表示だけでデータは変えない。次に開いた時も使う */
   function flip() {
@@ -615,7 +635,7 @@ export function render(root, [boardId]) {
     renderQueued = false;
     drawCourt(ctx, sport, viewport, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawStrokes(ctx, board.drawings, viewport);
+    if (!drawingsHidden) drawStrokes(ctx, board.drawings, viewport);
     if (current) drawStroke(ctx, current, viewport);
     pieces.layout();
     zoomLabel.textContent = `${Math.round(viewport.zoom * 100)}%`;
@@ -692,20 +712,30 @@ export function render(root, [boardId]) {
   }
 
   // ---- 書き込み ----
+  let textStart = null; // テキストツール: 押した位置 (離した時に入力欄を出す)
+
   function startDrawing(sx, sy) {
+    // 隠している時に書き始めたら表示に戻す (見えないまま消したり描いたりしないように)
+    if (drawingsHidden) setDrawingsHidden(false);
     if (tool.mode === 'eraser') {
       eraseRecorded = false;
       eraseAt(sx, sy);
       return;
     }
     const point = roundPoint(viewport.screenToCourt(sx, sy));
+    if (tool.mode === 'shape' && tool.shape === 'text') {
+      textStart = { sx, sy, point };
+      return;
+    }
+    const isShape = tool.mode === 'shape';
     current = {
       id: createId(),
-      type: tool.mode === 'arrow' ? 'arrow' : 'pen',
+      ...(isShape ? shapeToStroke(tool.shape) : { type: 'pen', dashed: false }),
       color: tool.color,
       width: tool.width,
-      points: tool.mode === 'arrow' ? [point, point] : [point],
+      points: isShape ? [point, point] : [point],
     };
+    if (!current.dashed) delete current.dashed;
     lastPenPoint = { x: sx, y: sy };
     requestDraw();
   }
@@ -717,7 +747,7 @@ export function render(root, [boardId]) {
     }
     if (!current) return;
     const point = roundPoint(viewport.screenToCourt(sx, sy));
-    if (current.type === 'arrow') {
+    if (current.type !== 'pen') {
       current.points[1] = point;
     } else {
       if (Math.hypot(sx - lastPenPoint.x, sy - lastPenPoint.y) < PEN_MIN_DISTANCE) return;
@@ -728,10 +758,19 @@ export function render(root, [boardId]) {
   }
 
   function finishDrawing() {
+    if (textStart) {
+      const start = textStart;
+      textStart = null;
+      // 既にあるテキストを押したら編集、それ以外は新しく置く
+      const existing = [...board.drawings].reverse().find((s) => s.type === 'text' && hitStroke(s, start.sx, start.sy, viewport, 2));
+      openTextEditor(existing ?? null, start.point);
+      return;
+    }
     if (!current) return;
     const stroke = current;
     current = null;
-    if (stroke.type === 'arrow') {
+    if (stroke.type !== 'pen') {
+      // 短すぎる矢印・直線・小さすぎる円はクリックとみなして描かない
       const [a, b] = stroke.points.map(([x, y]) => viewport.courtToScreen(x, y));
       if (Math.hypot(b.x - a.x, b.y - a.y) < MIN_ARROW_LENGTH) {
         requestDraw();
@@ -745,7 +784,56 @@ export function render(root, [boardId]) {
 
   function cancelDrawing() {
     current = null;
+    textStart = null;
     requestDraw();
+  }
+
+  /** テキストの入力 (新規 or 編集)。空にして決定すると削除 */
+  function openTextEditor(stroke, point) {
+    const input = h('input', {
+      type: 'text', class: 'input', maxlength: 40, value: stroke?.text ?? '',
+      placeholder: '例: ここでパス / 3番マーク', 'aria-label': 'テキスト',
+    });
+    const ok = h('button', { class: 'btn btn-primary', type: 'button' }, stroke ? '変更' : '置く');
+    const cancel = h('button', { class: 'btn', type: 'button' }, 'キャンセル');
+    const remove = stroke && h('button', { class: 'btn btn-danger', type: 'button' }, '削除');
+    const modal = openModal({
+      title: stroke ? 'テキストを編集' : 'テキストを置く',
+      body: h('div', { class: 'form' }, input,
+        h('p', { class: 'note' }, '色・大きさはツールバーの色と太さ (細・中・太) で決まります')),
+      footer: [remove, h('span', { class: 'spacer' }), cancel, ok].filter(Boolean),
+    });
+    const apply = () => {
+      const text = input.value.trim();
+      modal.close();
+      if (!text && !stroke) return;
+      record();
+      if (!text) {
+        board.drawings = board.drawings.filter((s) => s !== stroke);
+      } else if (stroke) {
+        board.drawings = board.drawings.map((s) => (s === stroke ? { ...s, text } : s));
+      } else {
+        board.drawings = [...board.drawings, { id: createId(), type: 'text', color: tool.color, width: tool.width, points: [point], text }];
+      }
+      commit();
+    };
+    ok.addEventListener('click', apply);
+    cancel.addEventListener('click', () => modal.close());
+    if (remove) {
+      remove.addEventListener('click', () => {
+        modal.close();
+        record();
+        board.drawings = board.drawings.filter((s) => s !== stroke);
+        commit();
+      });
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        apply();
+      }
+    });
+    input.focus();
   }
 
   function eraseAt(sx, sy) {
@@ -936,6 +1024,7 @@ export function render(root, [boardId]) {
 
   function updateCursor() {
     stage.dataset.mode = currentMode();
+    stage.dataset.shape = tool.shape;
   }
 
   function onTapPiece(id) {
@@ -1103,9 +1192,10 @@ export function render(root, [boardId]) {
     } else if (!mod && !e.altKey && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       setMaximized(!maximized);
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 'w') {
+      setDrawingsHidden(!drawingsHidden);
     } else if (!mod && !e.altKey) {
-      const mode = toolbar.modeForKey(e.key);
-      if (mode) toolbar.setMode(mode);
+      toolbar.handleKey(e.key);
     }
   }
 
@@ -1118,7 +1208,7 @@ export function render(root, [boardId]) {
 
   // ポップアップ (色・太さパネル、⋮ メニュー) は外を触ったら閉じる
   function onDocumentPointerDown(e) {
-    if (!e.target.closest?.('.style-group')) toolbar.closePanel();
+    toolbar.closePanelsOutside(e.target);
     if (!e.target.closest?.('.menu-wrap')) closeMenu();
   }
 
@@ -1136,6 +1226,7 @@ export function render(root, [boardId]) {
   const observer = new ResizeObserver(resize);
   observer.observe(stage);
   updateCursor();
+  updateDrawingsButton();
   setMaximized(false);
   renderAll();
   resize();

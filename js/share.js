@@ -9,6 +9,10 @@
 const FORMAT_VERSION = 1;
 const SCALE = 1000; // 座標は 0〜1 を 0〜1000 の整数にする (サッカーで約 10cm 単位)
 
+// 書き込みの種類の番号 (0 = ペン / 1 = 矢印 は最初の形式と同じ)
+const STROKE_CODES = { pen: 0, arrow: 1, dashArrow: 2, line: 3, circle: 5, text: 6 };
+const strokeKey = (stroke) => (stroke.type === 'arrow' && stroke.dashed ? 'dashArrow' : stroke.type);
+
 const q = (v) => Math.round(v * SCALE);
 const uq = (v) => v / SCALE;
 
@@ -56,7 +60,9 @@ export function toShareData(board, sport, playerOf) {
         px = qx;
         py = qy;
       }
-      return [stroke.type === 'arrow' ? 1 : 0, color >= 0 ? color : stroke.color, stroke.width, ...points];
+      const row = [STROKE_CODES[strokeKey(stroke)] ?? 0, color >= 0 ? color : stroke.color, stroke.width, ...points];
+      if (stroke.type === 'text') row.push(stroke.text ?? '');
+      return row;
     });
   }
   return data;
@@ -89,7 +95,8 @@ export function fromShareData(data, sport) {
     templateId: null,
     markers: (data.a ?? []).map(([position, x, y], i) => ({ id: `m${i}`, position, x: uq(x), y: uq(y) })),
   };
-  const drawings = (data.w ?? []).map(([type, color, width, ...deltas], i) => {
+  const drawings = (data.w ?? []).map(([code, color, width, ...deltas], i) => {
+    const text = code === STROKE_CODES.text && typeof deltas[deltas.length - 1] === 'string' ? deltas.pop() : null;
     const points = [];
     let x = 0;
     let y = 0;
@@ -98,13 +105,17 @@ export function fromShareData(data, sport) {
       y += deltas[k + 1];
       points.push([uq(x), uq(y)]);
     }
-    return {
+    const key = Object.keys(STROKE_CODES).find((k) => STROKE_CODES[k] === code) ?? 'pen';
+    const stroke = {
       id: `d${i}`,
-      type: type === 1 ? 'arrow' : 'pen',
+      type: key === 'dashArrow' ? 'arrow' : key,
       color: typeof color === 'number' ? (sport?.penColors[color] ?? '#e53935') : color,
       width,
       points,
     };
+    if (key === 'dashArrow') stroke.dashed = true;
+    if (text !== null) stroke.text = text;
+    return stroke;
   });
   return {
     sportId: data.s,

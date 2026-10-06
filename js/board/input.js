@@ -2,7 +2,7 @@
 //
 // 1本指 (左ボタン) の動きはモードで変わる
 //   move   : 駒を押してドラッグ → 駒の移動 / 何もない所をドラッグ → パン / 動かさずに離す → タップ
-//   pen / arrow / eraser : 書き込み (押した瞬間から)
+//   pen / shape / eraser : 書き込み (押した瞬間から)
 //   hand   : どこを押してもパン
 // どのモードでも共通
 //   2本指 → ピンチで拡大縮小 + 2本指の移動でパン (書き込み中に2本目が来たら書き込みは取り消し)
@@ -13,12 +13,12 @@
 // これ以上動いたらタップではなくドラッグとみなす (px)
 const DRAG_THRESHOLD = { mouse: 4, pen: 6, touch: 10 };
 
-const DRAW_MODES = new Set(['pen', 'arrow', 'eraser']);
+const DRAW_MODES = new Set(['pen', 'shape', 'eraser']);
 
 /**
  * @param {HTMLElement} stage
  * @param {object} handlers
- * @param {() => 'move' | 'pen' | 'arrow' | 'eraser' | 'hand'} handlers.getMode
+ * @param {() => 'move' | 'pen' | 'shape' | 'eraser' | 'hand'} handlers.getMode
  * @param {(target: EventTarget) => string | null} handlers.hitPiece 押した要素の駒ID
  * @param {(id: string) => {x: number, y: number}} handlers.pieceScreenPosition
  * @param {(id: string, x: number, y: number) => void} handlers.onPieceDragStart

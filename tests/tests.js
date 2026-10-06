@@ -9,7 +9,7 @@ import {
 import { Viewport } from '../js/board/viewport.js';
 import { assignPlayersToSlots } from '../js/board/formation.js';
 import { History } from '../js/board/history.js';
-import { hitStroke, roundPoint, lineWidthPx } from '../js/board/drawing.js';
+import { hitStroke, roundPoint, lineWidthPx, shapeToStroke } from '../js/board/drawing.js';
 import {
   locate, movePlayer, moveSlot, removePlayer, applyTemplate, autoFill,
   guestsNeeded, fillWithGuests, pruneGuests, guestAsPlayer,
@@ -302,6 +302,25 @@ test('hitStroke: 矢印は始点と終点を結ぶ線で判定', () => {
   if (!hitStroke(arrow, 424, 224, v)) throw new Error('中点に当たらない');
   if (hitStroke(arrow, 424, 300, v)) throw new Error('離れているのに当たる');
 });
+test('hitStroke: 円は円周の近くだけ当たる (中は当たらない)', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448); // 100%: コート 0.1 (横) = 80px、0.1 (縦) = 40px
+  const circle = { type: 'circle', width: 2, points: [[0.5, 0.5], [0.6, 0.5]] }; // 中心 (424,224) 半径 80px
+  if (!hitStroke(circle, 504, 224, v)) throw new Error('円周に当たらない');
+  if (!hitStroke(circle, 424, 144, v)) throw new Error('円周 (上) に当たらない');
+  if (hitStroke(circle, 424, 224, v)) throw new Error('中心なのに当たる');
+});
+test('hitStroke: テキストは文字の範囲で当たる', () => {
+  const v = new Viewport(2);
+  v.resize(848, 448);
+  const text = { type: 'text', width: 2, points: [[0.5, 0.5]], text: 'パス' }; // 18px × 2文字 ≒ 幅 36px
+  if (!hitStroke(text, 424 + 15, 224, v, 0)) throw new Error('文字の上に当たらない');
+  if (hitStroke(text, 424 + 40, 224, v, 0)) throw new Error('文字の外なのに当たる');
+});
+test('shapeToStroke: 点線矢印は arrow + dashed', () => {
+  assertEqual(shapeToStroke('dashArrow'), { type: 'arrow', dashed: true });
+  assertEqual(shapeToStroke('circle'), { type: 'circle', dashed: false });
+});
 
 // --- board/lineup ---
 const lineupHome = () => ({
@@ -527,6 +546,22 @@ test('share: 11対11 + 矢印5本 + ペン2本 で URL が短い (1000文字未�
   };
   const code = await encodeShare(toShareData(board, shareSport, (id) => players[id]));
   if (code.length >= 1000) throw new Error(`${code.length}文字`);
+});
+test('share: 点線矢印・直線・円・テキストも往復できる', async () => {
+  const { board, playerOf } = shareBoard();
+  board.drawings = [
+    { type: 'arrow', dashed: true, color: '#ffffff', width: 1, points: [[0.1, 0.2], [0.3, 0.4]] },
+    { type: 'line', color: '#1e88e5', width: 2, points: [[0.5, 0.5], [0.6, 0.7]] },
+    { type: 'circle', color: '#fdd835', width: 3, points: [[0.7, 0.5], [0.75, 0.5]] },
+    { type: 'text', color: '#e53935', width: 2, points: [[0.4, 0.3]], text: 'ここでパス' },
+  ];
+  const shared = fromShareData(await decodeShare(await encodeShare(toShareData(board, shareSport, playerOf))), shareSport);
+  assertEqual(shared.drawings.map(({ type, dashed, color, width, points, text }) => ({ type, dashed, color, width, points, text })), [
+    { type: 'arrow', dashed: true, color: '#ffffff', width: 1, points: [[0.1, 0.2], [0.3, 0.4]], text: undefined },
+    { type: 'line', dashed: undefined, color: '#1e88e5', width: 2, points: [[0.5, 0.5], [0.6, 0.7]], text: undefined },
+    { type: 'circle', dashed: undefined, color: '#fdd835', width: 3, points: [[0.7, 0.5], [0.75, 0.5]], text: undefined },
+    { type: 'text', dashed: undefined, color: '#e53935', width: 2, points: [[0.4, 0.3]], text: 'ここでパス' },
+  ]);
 });
 test('share: 壊れた文字列はエラー', async () => {
   let failed = false;
