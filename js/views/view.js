@@ -59,7 +59,9 @@ export function render(root, [code]) {
 function showBoard(root, shared, sport) {
   const [courtLength, courtWidth] = courtSize(sport);
   const viewport = new Viewport(courtLength / courtWidth);
-  viewport.orientation = storage.read(KEYS.settings, {}).boardOrientation ?? 'auto';
+  const settings = storage.read(KEYS.settings, {});
+  viewport.orientation = settings.boardOrientation ?? 'auto';
+  viewport.flipped = settings.boardFlipped ?? false;
   const playersById = new Map(shared.players.map((p) => [p.id, p]));
 
   const canvas = h('canvas', { class: 'board-court', 'aria-hidden': 'true' });
@@ -74,6 +76,10 @@ function showBoard(root, shared, sport) {
       class: 'zoom-button', type: 'button', 'aria-label': '回転', title: '回転 (横長 ⇔ 縦長・自陣が手前)',
       onclick: () => { viewport.setOrientation(viewport.portrait ? 'landscape' : 'portrait'); requestDraw(); },
     }, '⟳'),
+    h('button', {
+      class: 'zoom-button', type: 'button', 'aria-label': '反転', title: '反転 (自陣を反対側に)',
+      onclick: () => { viewport.setFlipped(!viewport.flipped); requestDraw(); },
+    }, '⇅'),
   );
   zoomLabel.addEventListener('click', () => { viewport.setZoom(1); requestDraw(); });
   const stage = h('div', { class: 'board-stage', dataset: { mode: 'hand' } }, canvas, pieceContainer, zoomControls);

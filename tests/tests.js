@@ -202,6 +202,23 @@ test('viewport: 回転 (横長の画面でも縦長にすると自陣が手前=�
   v.resize(448, 848);
   assertEqual(v.portrait, true);
 });
+test('viewport: 反転 (180°) = 横長なら自陣が右、縦長なら自陣が奥 / 往復・メートル変換も一致', () => {
+  for (const [w, hgt, portrait] of [[848, 448, false], [448, 848, true]]) {
+    const v = new Viewport(105 / 68);
+    v.resize(w, hgt);
+    v.setFlipped(true);
+    const own = v.courtToScreen(0, 0.5);
+    const enemy = v.courtToScreen(1, 0.5);
+    if (portrait ? !(own.y < enemy.y) : !(own.x > enemy.x)) throw new Error(`自陣の位置が違う (portrait=${portrait})`);
+    v.setZoom(1.7, 90, 130);
+    const s = v.courtToScreen(0.3, 0.8);
+    assertPoint(v.screenToCourt(s.x, s.y), { x: 0.3, y: 0.8 });
+    const [a, b, c, d, e, f] = v.meterTransform(105, 68);
+    const mx = 30, my = 50;
+    const p = v.courtToScreen(mx / 105, my / 68);
+    assertPoint({ x: a * mx + c * my + e, y: b * mx + d * my + f }, p);
+  }
+});
 test('viewport: パンしてもコートの端は画面中央まで', () => {
   const v = new Viewport(2);
   v.resize(848, 448);

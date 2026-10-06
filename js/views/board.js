@@ -85,6 +85,7 @@ export function render(root, [boardId]) {
   const history = new History();
   const settings = storage.read(KEYS.settings, {});
   viewport.orientation = settings.boardOrientation ?? 'auto';
+  viewport.flipped = settings.boardFlipped ?? false;
 
   let players = listPlayers();
   let playersById = new Map(players.map((p) => [p.id, p]));
@@ -373,8 +374,17 @@ export function render(root, [boardId]) {
     h('button', { class: 'zoom-button', type: 'button', 'aria-label': '全体表示', title: '全体表示', onclick: fitAll }, '⛶'),
   );
   const rotateButton = h('button', { class: 'zoom-button', type: 'button', onclick: rotate }, '⟳');
+  const flipButton = h('button', { class: 'zoom-button', type: 'button', onclick: flip }, '⇅');
   const maximizeButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setMaximized(!maximized) });
-  zoomControls.append(rotateButton, maximizeButton);
+  zoomControls.append(rotateButton, flipButton, maximizeButton);
+
+  /** 反転 (180度): 自陣を反対側に表示する。表示だけでデータは変えない。次に開いた時も使う */
+  function flip() {
+    viewport.setFlipped(!viewport.flipped);
+    updateSettings({ boardFlipped: viewport.flipped });
+    updateRotateButton();
+    requestDraw();
+  }
 
   /** 回転: 横長 (自陣が左) ⇔ 縦長 (自陣が手前=下)。選んだ向きは次に開いた時も使う */
   function rotate() {
@@ -386,9 +396,14 @@ export function render(root, [boardId]) {
   }
 
   function updateRotateButton() {
-    const label = viewport.portrait ? '横向きにする (自陣が左) (R)' : '縦向きにする (自陣が手前) (R)';
+    const near = viewport.flipped ? ['右', '奥'] : ['左', '手前'];
+    const label = viewport.portrait ? `横向きにする (自陣が${near[0]}) (R)` : `縦向きにする (自陣が${near[1]}) (R)`;
     rotateButton.setAttribute('aria-label', label);
     rotateButton.title = label;
+    const flipLabel = viewport.flipped ? '反転を戻す (T)' : '反転: 自陣を反対側に (T)';
+    flipButton.setAttribute('aria-label', flipLabel);
+    flipButton.title = flipLabel;
+    flipButton.setAttribute('aria-pressed', String(viewport.flipped));
   }
   const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, detailCard.el, zoomControls);
 
@@ -1080,6 +1095,8 @@ export function render(root, [boardId]) {
       toggleBall();
     } else if (!mod && !e.altKey && e.key.toLowerCase() === 'r') {
       rotate();
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 't') {
+      flip();
     } else if (e.key === '?') {
       e.preventDefault();
       showShortcuts();

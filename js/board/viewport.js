@@ -6,6 +6,7 @@
 //   ワールド座標: コートの短辺 = 1。横長表示なら 幅 aspect × 高さ 1、縦長表示なら 幅 1 × 高さ aspect
 //   画面座標: ステージ (コート表示エリア) 左上からの CSS px
 // 縦長表示では 自陣 = 下、敵陣 = 上 になるよう 90度回転する
+// flipped = true の時はさらに 180度回す (自陣が右 / 奥。表示だけでデータは変えない)
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 4;
@@ -20,6 +21,8 @@ export class Viewport {
     this.portrait = false;
     /** 'auto' = 画面の形で決める / 'landscape' = 横長 (自陣が左) / 'portrait' = 縦長 (自陣が手前=下) */
     this.orientation = 'auto';
+    /** 反転 (180度回転)。反対側から見る時用 */
+    this.flipped = false;
     this.fitScale = 1; // 全体表示の時の scale (= 100%)
     this.scale = 1; // ワールド 1 あたりの px
     this.offsetX = 0;
@@ -29,6 +32,12 @@ export class Viewport {
   get worldWidth() { return this.portrait ? 1 : this.aspect; }
   get worldHeight() { return this.portrait ? this.aspect : 1; }
   get zoom() { return this.scale / this.fitScale; }
+
+  /** 反転する / 戻す (反転ボタン)。全体表示にし直す */
+  setFlipped(flipped) {
+    this.flipped = flipped;
+    if (this.width > 0 && this.height > 0) this.fit();
+  }
 
   /** 向きを指定する (回転ボタン)。変わったら全体表示にし直す */
   setOrientation(orientation) {
@@ -114,15 +123,20 @@ export class Viewport {
   }
 
   courtToWorld(x, y) {
+    if (this.flipped) {
+      x = 1 - x;
+      y = 1 - y;
+    }
     return this.portrait
       ? { x: y, y: (1 - x) * this.aspect }
       : { x: x * this.aspect, y };
   }
 
   worldToCourt(wx, wy) {
-    return this.portrait
+    const c = this.portrait
       ? { x: 1 - wy / this.aspect, y: wx }
       : { x: wx / this.aspect, y: wy };
+    return this.flipped ? { x: 1 - c.x, y: 1 - c.y } : c;
   }
 
   courtToScreen(x, y) {
@@ -141,8 +155,15 @@ export class Viewport {
    */
   meterTransform(lengthM, widthM) {
     const k = this.scale / widthM;
+    const { offsetX: ox, offsetY: oy } = this;
+    if (this.flipped) {
+      // (mx, my) → (lengthM - mx, widthM - my) にしてから通常の変換
+      return this.portrait
+        ? [0, k, -k, 0, ox + k * widthM, oy]
+        : [-k, 0, 0, -k, ox + k * lengthM, oy + k * widthM];
+    }
     return this.portrait
-      ? [0, -k, k, 0, this.offsetX, this.offsetY + k * lengthM]
-      : [k, 0, 0, k, this.offsetX, this.offsetY];
+      ? [0, -k, k, 0, ox, oy + k * lengthM]
+      : [k, 0, 0, k, ox, oy];
   }
 }
