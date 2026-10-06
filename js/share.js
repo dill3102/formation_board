@@ -66,22 +66,30 @@ export function toShareData(board, sport, playerOf) {
     });
   }
   // コマ送り: 各コマ = [種類, 番号, x, y, …] (種類 0 = h の行 / 1 = 敵マーカー a / 2 = ボール)
-  if (board.steps?.length) {
-    const refs = {};
-    board.home.slots.forEach((s, i) => { if (s.playerId) refs[`p:${s.playerId}`] = [0, i]; });
-    board.home.free.forEach((f, j) => { refs[`p:${f.playerId}`] = [0, board.home.slots.length + j]; });
-    board.away.markers.forEach((m, k) => { refs[`m:${m.id}`] = [1, k]; });
-    refs.b = [2, 0];
-    data.f = board.steps.map((step) => Object.entries(step)
-      .filter(([key]) => refs[key])
-      .flatMap(([key, [x, y]]) => [...refs[key], q(x), q(y)]));
+  const refs = {};
+  board.home.slots.forEach((s, i) => { if (s.playerId) refs[`p:${s.playerId}`] = [0, i]; });
+  board.home.free.forEach((f, j) => { refs[`p:${f.playerId}`] = [0, board.home.slots.length + j]; });
+  board.away.markers.forEach((m, k) => { refs[`m:${m.id}`] = [1, k]; });
+  refs.b = [2, 0];
+  const encodeSteps = (steps) => steps.map((step) => Object.entries(step)
+    .filter(([key]) => refs[key])
+    .flatMap(([key, [x, y]]) => [...refs[key], q(x), q(y)]));
+  // 案 (ルート) が複数ある・説明がある時は r = [[名前, 説明, コマ], …]、ri = 表示中の案の番号
+  const plays = board.plays?.length
+    ? board.plays.map((p) => (p.id === board.activePlayId ? { ...p, steps: board.steps ?? [] } : p))
+    : [{ name: '案1', note: '', steps: board.steps ?? [] }];
+  if (plays.length > 1 || plays.some((p) => p.note)) {
+    data.r = plays.map((p) => [p.name, p.note ?? '', encodeSteps(p.steps ?? [])]);
+    data.ri = Math.max(0, plays.findIndex((p) => p.id === board.activePlayId));
+  } else if (board.steps?.length) {
+    data.f = encodeSteps(board.steps);
   }
   return data;
 }
 
 /**
  * 共有データ → 表示用の配置
- * @returns {{ sportId, name, date, players: object[], home: object, away: object, ball, drawings, steps }}
+ * @returns {{ sportId, name, date, players: object[], home: object, away: object, ball, drawings, steps, plays, activePlayId }}
  *   players = 共有された選手 (id は "s0", "s1" …)。home は slots / free / bench (players の id を参照)
  */
 export function fromShareData(data, sport) {
@@ -135,6 +143,19 @@ export function fromShareData(data, sport) {
     if (text !== null) stroke.text = text;
     return stroke;
   });
+  const decodeSteps = (list) => (list ?? []).map((flat) => {
+    const step = {};
+    for (let k = 0; k + 3 < flat.length; k += 4) {
+      const [type, index, x, y] = flat.slice(k, k + 4);
+      const key = type === 0 ? rowKeys[index] : type === 1 ? `m:m${index}` : 'b';
+      if (key) step[key] = [uq(x), uq(y)];
+    }
+    return step;
+  });
+  const plays = data.r
+    ? data.r.map(([name, note, steps], i) => ({ id: `play-${i + 1}`, name, note: note ?? '', steps: decodeSteps(steps) }))
+    : [{ id: 'play-1', name: '案1', note: '', steps: decodeSteps(data.f) }];
+  const active = plays[data.ri ?? 0] ?? plays[0];
   return {
     sportId: data.s,
     name: data.n ?? '',
@@ -144,15 +165,9 @@ export function fromShareData(data, sport) {
     away,
     ball: data.b ? { x: uq(data.b[0]), y: uq(data.b[1]) } : null,
     drawings,
-    steps: (data.f ?? []).map((flat) => {
-      const step = {};
-      for (let k = 0; k + 3 < flat.length; k += 4) {
-        const [type, index, x, y] = flat.slice(k, k + 4);
-        const key = type === 0 ? rowKeys[index] : type === 1 ? `m:m${index}` : 'b';
-        if (key) step[key] = [uq(x), uq(y)];
-      }
-      return step;
-    }),
+    plays,
+    activePlayId: active.id,
+    steps: active.steps,
   };
 }
 

@@ -84,6 +84,70 @@ export function interpolate(from, to, t) {
   return result;
 }
 
+// ---- 案 (ルート) ----
+// 1つの配置の中に、コマの流れを複数持てる (このプレーの時: 案1 = …、案2 = …)
+//   board.plays = [{ id, name, note, steps }]、board.activePlayId = 表示中の案
+//   表示中の案のコマは board.steps に置いて使う (plays 側は切り替え・保存の時にそろえる)
+// コマ1 (配置そのもの) は全部の案で共通
+
+/** 案が無い (古い配置) 時は、今のコマを「案1」にする */
+export function ensurePlays(board) {
+  if (board.plays?.length) {
+    const active = board.plays.some((p) => p.id === board.activePlayId) ? board.activePlayId : board.plays[0].id;
+    return { plays: board.plays, activePlayId: active };
+  }
+  return { plays: [{ id: 'play-1', name: '案1', note: '', steps: board.steps ?? [] }], activePlayId: 'play-1' };
+}
+
+/** 表示中の案のコマ (board.steps) を plays に書き戻した plays */
+export function syncPlays(board) {
+  const { plays, activePlayId } = ensurePlays(board);
+  return plays.map((p) => (p.id === activePlayId ? { ...p, steps: board.steps ?? [] } : p));
+}
+
+export function activePlay(board) {
+  const { plays, activePlayId } = ensurePlays(board);
+  return plays.find((p) => p.id === activePlayId);
+}
+
+/** 案を切り替える → { plays, activePlayId, steps } */
+export function switchPlay(board, id) {
+  const plays = syncPlays(board);
+  const target = plays.find((p) => p.id === id) ?? plays[0];
+  return { plays, activePlayId: target.id, steps: target.steps.map((s) => ({ ...s })) };
+}
+
+function nextPlayName(plays) {
+  const max = Math.max(0, ...plays.map((p) => Number(/^案(\d+)$/.exec(p.name)?.[1] ?? 0)));
+  return `案${max + 1}`;
+}
+
+/**
+ * 派生: 今の案の コマ1〜コマ(frameIndex+1) を共通部分として、新しい案を作って切り替える
+ * → { plays, activePlayId, steps }
+ */
+export function branchPlay(board, frameIndex, newId) {
+  const plays = syncPlays(board);
+  const steps = (board.steps ?? []).slice(0, frameIndex).map((s) => ({ ...s }));
+  const play = { id: newId, name: nextPlayName(plays), note: '', steps };
+  return { plays: [...plays, play], activePlayId: newId, steps: steps.map((s) => ({ ...s })) };
+}
+
+/** 案を消す (最後の1つは消せない → null)。表示中の案を消したら最初の案に切り替え */
+export function deletePlay(board, id) {
+  const plays = syncPlays(board);
+  if (plays.length <= 1) return null;
+  const remaining = plays.filter((p) => p.id !== id);
+  const { activePlayId } = ensurePlays(board);
+  const target = remaining.find((p) => p.id === activePlayId) ?? remaining[0];
+  return { plays: remaining, activePlayId: target.id, steps: target.steps.map((s) => ({ ...s })) };
+}
+
+/** 案の名前・説明を変える → plays */
+export function updatePlay(board, id, change) {
+  return syncPlays(board).map((p) => (p.id === id ? { ...p, ...change } : p));
+}
+
 /** コマ index (1 以上) で、前のコマから動いた駒 [key, 前の位置, 今の位置] */
 export function movesInto(board, index) {
   if (index < 1) return [];

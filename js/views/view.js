@@ -89,7 +89,8 @@ function showBoard(root, shared, sport) {
     }, '⇅'),
   );
   zoomLabel.addEventListener('click', () => { viewport.setZoom(1); requestDraw(); });
-  const stage = h('div', { class: 'board-stage', dataset: { mode: 'hand' } }, canvas, pieceContainer, zoomControls);
+  const routeCaption = h('div', { class: 'route-caption', hidden: true });
+  const stage = h('div', { class: 'board-stage', dataset: { mode: 'hand' } }, canvas, pieceContainer, routeCaption, zoomControls);
 
   const benchPlayers = shared.home.bench.map((id) => playersById.get(id)).filter(Boolean);
   const bench = benchPlayers.length > 0 && h('div', { class: 'bench' },
@@ -99,8 +100,23 @@ function showBoard(root, shared, sport) {
   );
 
   // ---- コマ送り (コマがある時だけ) ----
-  const count = frameCount(shared);
+  const plays = shared.plays ?? [{ id: 'play-1', name: '案1', note: '', steps: shared.steps ?? [] }];
+  let count = frameCount(shared);
   let frame = 0;
+  const routeSelect = plays.length > 1 && h('select', { class: 'input frame-route', 'aria-label': '案 (ルート)' },
+    plays.map((p) => h('option', { value: p.id }, p.name)));
+  if (routeSelect) {
+    routeSelect.value = shared.activePlayId;
+    routeSelect.addEventListener('change', () => {
+      playback.stop();
+      const play = plays.find((p) => p.id === routeSelect.value);
+      shared.activePlayId = play.id;
+      shared.steps = play.steps;
+      count = frameCount(shared);
+      showFrame(0);
+    });
+  }
+  const routeNote = h('div', { class: 'frame-note', hidden: true });
   let speedId = settings.animSpeed ?? 'normal';
   const framePrev = h('button', { class: 'frame-button', type: 'button', 'aria-label': '前のコマ', onclick: () => showFrame(frame - 1) }, '◀');
   const frameNext = h('button', { class: 'frame-button', type: 'button', 'aria-label': '次のコマ', onclick: () => showFrame(frame + 1) }, '▶');
@@ -109,9 +125,13 @@ function showBoard(root, shared, sport) {
   const speedSelect = h('select', { class: 'input frame-speed', 'aria-label': '再生の速さ' }, SPEEDS.map((s) => h('option', { value: s.id }, s.label)));
   speedSelect.value = SPEEDS.some((s) => s.id === speedId) ? speedId : 'normal';
   speedSelect.addEventListener('change', () => { speedId = speedSelect.value; });
-  const frameBar = count > 1 && h('div', { class: 'frame-bar', role: 'group', 'aria-label': 'コマ送り' },
-    h('span', { class: 'frame-title' }, '🎬', h('span', { class: 'frame-text' }, ' コマ')),
-    framePrev, frameLabel, frameNext, framePlay, speedSelect,
+  const hasFrames = plays.some((p) => (p.steps?.length ?? 0) > 0);
+  const frameBar = (hasFrames || plays.length > 1) && h('div', { class: 'frame-bar', role: 'group', 'aria-label': 'コマ送り' },
+    routeSelect && h('div', { class: 'frame-group frame-routes' }, routeSelect),
+    h('div', { class: 'frame-group' },
+      h('span', { class: 'frame-title' }, '🎬', h('span', { class: 'frame-text' }, ' コマ')),
+      framePrev, frameLabel, frameNext, framePlay, speedSelect),
+    routeNote,
   );
 
   const saveButton = h('button', { class: 'btn btn-primary btn-small', type: 'button' }, '自分の配置として保存');
@@ -161,8 +181,15 @@ function showBoard(root, shared, sport) {
   }
 
   function updateFrameBar() {
+    const play = plays.find((p) => p.id === shared.activePlayId) ?? plays[0];
+    const caption = play && (plays.length > 1 || play.note) ? `${play.name}${play.note ? `：${play.note}` : ''}` : '';
+    routeCaption.textContent = caption;
+    routeCaption.hidden = !caption;
+    routeNote.textContent = play?.note ? `${play.name}：${play.note}` : '';
+    routeNote.hidden = !play?.note;
     if (!frameBar) return;
     frameLabel.textContent = `${frame + 1} / ${count}`;
+    framePlay.disabled = count < 2 && !playback.playing;
     framePrev.disabled = frame === 0 || playback.playing;
     frameNext.disabled = frame >= count - 1 || playback.playing;
     framePlay.textContent = playback.playing ? '■ 停止' : '▶ 再生';
@@ -268,12 +295,17 @@ function importBoard(shared, sport) {
   board.away = { templateId: null, markers: shared.away.markers.map((m) => ({ ...m, id: markerIds.get(m.id) })) };
   board.ball = shared.ball;
   board.drawings = shared.drawings.map((d) => ({ ...d, id: createId() }));
-  // コマ送り: 共有の ID を自分の配置の ID に付け替える
-  board.steps = (shared.steps ?? []).map((step) => Object.fromEntries(Object.entries(step).map(([key, pos]) => {
+  // コマ送り・案: 共有の ID を自分の配置の ID に付け替える
+  const mapSteps = (steps) => (steps ?? []).map((step) => Object.fromEntries(Object.entries(step).map(([key, pos]) => {
     if (key.startsWith('p:')) return [`p:${idMap.get(key.slice(2))}`, pos];
     if (key.startsWith('m:')) return [`m:${markerIds.get(key.slice(2))}`, pos];
     return [key, pos];
   })));
+  const sharedPlays = shared.plays ?? [{ id: 'play-1', name: '案1', note: '', steps: shared.steps ?? [] }];
+  const playIds = new Map(sharedPlays.map((p) => [p.id, createId()]));
+  board.plays = sharedPlays.map((p) => ({ id: playIds.get(p.id), name: p.name, note: p.note ?? '', steps: mapSteps(p.steps) }));
+  board.activePlayId = playIds.get(shared.activePlayId) ?? board.plays[0].id;
+  board.steps = board.plays.find((p) => p.id === board.activePlayId).steps.map((s) => ({ ...s }));
 
   try {
     const saved = saveBoard(board);

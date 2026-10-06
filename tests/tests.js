@@ -19,6 +19,7 @@ import { applyStatus, applyArrived, countDay, filterByAttendance, describe } fro
 import { toShareData, fromShareData, encodeShare, decodeShare } from '../js/share.js';
 import {
   frameCount, positionsAt, setStepPosition, insertFrame, removeFrame, pruneSteps, interpolate, movesInto,
+  ensurePlays, syncPlays, switchPlay, branchPlay, deletePlay, updatePlay,
 } from '../js/board/frames.js';
 
 const tests = [];
@@ -545,6 +546,43 @@ test('frames: 途中の位置 (ease in-out。半分で真ん中、端はその�
   assertEqual(interpolate(from, to, 1).k, [1, 0.5]);
 });
 
+test('frames.案: 古い配置は今のコマを「案1」にする', () => {
+  const b = { ...frameBoard(), steps: [{ 'p:a': [0.1, 0.5] }] };
+  assertEqual(ensurePlays(b), { plays: [{ id: 'play-1', name: '案1', note: '', steps: [{ 'p:a': [0.1, 0.5] }] }], activePlayId: 'play-1' });
+});
+test('frames.案: 派生 = 今のコマまでを共通にして新しい案 (案2) に切り替え', () => {
+  const b = { ...frameBoard(), steps: [{ 'p:a': [0.1, 0.5] }, { 'p:a': [0.2, 0.5] }, { 'p:a': [0.3, 0.5] }] };
+  Object.assign(b, ensurePlays(b));
+  Object.assign(b, branchPlay(b, 2, 'x')); // コマ3 から派生 → コマ2・3 (steps 0〜1) を共通に
+  assertEqual(b.activePlayId, 'x');
+  assertEqual(b.plays.map((p) => p.name), ['案1', '案2']);
+  assertEqual(b.steps, [{ 'p:a': [0.1, 0.5] }, { 'p:a': [0.2, 0.5] }]);
+  assertEqual(frameCount(b), 3);
+  // 案2 を変えても 案1 は変わらない
+  b.steps = setStepPosition(b, 2, 'p:a', 0.9, 0.9);
+  assertEqual(syncPlays(b)[0].steps[1], { 'p:a': [0.2, 0.5] });
+});
+test('frames.案: 切り替えると、それぞれのコマが戻る', () => {
+  const b = { ...frameBoard(), steps: [{ 'p:a': [0.1, 0.5] }] };
+  Object.assign(b, ensurePlays(b));
+  Object.assign(b, branchPlay(b, 1, 'x'));
+  b.steps = [...b.steps, { 'p:a': [0.7, 0.7] }];
+  Object.assign(b, switchPlay(b, 'play-1'));
+  assertEqual(b.steps, [{ 'p:a': [0.1, 0.5] }]);
+  Object.assign(b, switchPlay(b, 'x'));
+  assertEqual(b.steps, [{ 'p:a': [0.1, 0.5] }, { 'p:a': [0.7, 0.7] }]);
+});
+test('frames.案: 名前・説明の変更と削除 (最後の1つは消せない)', () => {
+  const b = { ...frameBoard() };
+  Object.assign(b, ensurePlays(b));
+  assertEqual(deletePlay(b, 'play-1'), null);
+  Object.assign(b, branchPlay(b, 0, 'x'));
+  b.plays = updatePlay(b, 'x', { note: '右サイドへ展開' });
+  const after = deletePlay(b, 'x');
+  assertEqual(after.activePlayId, 'play-1');
+  assertEqual(after.plays.length, 1);
+});
+
 // --- share ---
 const shareSport = { id: 'soccer', penColors: ['#ffffff', '#e53935', '#1e88e5', '#fdd835'] };
 function shareBoard() {
@@ -637,6 +675,22 @@ test('share: コマ送りも往復できる (選手・敵・ボールの ID を�
   ]);
   assertEqual(frameCount(shared), 3);
   assertEqual(positionsAt(shared, 2)['p:s0'], [0.5, 0.45]);
+});
+test('share: 案 (ルート) も往復できる (名前・説明・それぞれのコマ・表示中の案)', async () => {
+  const { board, playerOf } = shareBoard();
+  board.plays = [
+    { id: 'play-1', name: '案1', note: '右へ展開', steps: [{ 'p:a': [0.5, 0.3] }] },
+    { id: 'q', name: '案2', note: '', steps: [] },
+  ];
+  board.activePlayId = 'q';
+  board.steps = [{ b: [0.6, 0.6] }, { 'p:b': [0.4, 0.4] }];
+  const shared = fromShareData(await decodeShare(await encodeShare(toShareData(board, shareSport, playerOf))), shareSport);
+  assertEqual(shared.plays.map((p) => [p.name, p.note, p.steps]), [
+    ['案1', '右へ展開', [{ 'p:s0': [0.5, 0.3] }]],
+    ['案2', '', [{ b: [0.6, 0.6] }, { 'p:s1': [0.4, 0.4] }]],
+  ]);
+  assertEqual(shared.activePlayId, 'play-2');
+  assertEqual(shared.steps, [{ b: [0.6, 0.6] }, { 'p:s1': [0.4, 0.4] }]);
 });
 test('share: 壊れた文字列はエラー', async () => {
   let failed = false;

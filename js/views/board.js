@@ -26,6 +26,7 @@ import { createToolbar } from '../board/toolbar.js';
 import { createDetailCard } from '../board/detail-card.js';
 import {
   frameCount, positionsAt, setStepPosition, insertFrame, removeFrame, pruneSteps, movesInto,
+  ensurePlays, syncPlays, activePlay, switchPlay, branchPlay, deletePlay, updatePlay,
 } from '../board/frames.js';
 import { createPlayback, SPEEDS, pieceIdOf, frameKeyOf } from '../board/playback.js';
 import { makeDraggable } from '../board/drag-ghost.js';
@@ -84,6 +85,7 @@ export function render(root, [boardId]) {
     return;
   }
   updateSettings({ lastBoardId: board.id });
+  Object.assign(board, ensurePlays(board)); // 案 (ルート) が無い古い配置は「案1」にする
 
   const [courtLength, courtWidth] = courtSize(sport);
   const viewport = new Viewport(courtLength / courtWidth);
@@ -111,7 +113,7 @@ export function render(root, [boardId]) {
 
   function saveNow() {
     try {
-      board = saveBoard(board);
+      board = saveBoard({ ...board, plays: syncPlays(board) });
       saveFailed = false;
       saveStatus.textContent = '';
     } catch (err) {
@@ -433,7 +435,8 @@ export function render(root, [boardId]) {
     flipButton.title = flipLabel;
     flipButton.setAttribute('aria-pressed', String(viewport.flipped));
   }
-  const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, detailCard.el, zoomControls);
+  const routeCaption = h('div', { class: 'route-caption', hidden: true, 'aria-live': 'polite' });
+  const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, routeCaption, detailCard.el, zoomControls);
 
   // ---- ベンチ ----
   const benchList = h('div', { class: 'bench-list' });
@@ -456,7 +459,16 @@ export function render(root, [boardId]) {
   const frameNext = h('button', { class: 'frame-button', type: 'button', 'aria-label': '次のコマ', title: '次のコマ (→)', onclick: () => setFrame(frame + 1) }, '▶');
   const frameLabel = h('span', { class: 'frame-label', 'aria-live': 'polite' });
   const frameAdd = h('button', { class: 'frame-button', type: 'button', title: 'このコマの後ろにコマを追加', onclick: addFrame }, '＋', h('span', { class: 'frame-text' }, ' コマ'));
-  const frameDelete = h('button', { class: 'frame-button', type: 'button', 'aria-label': 'このコマを削除', title: 'このコマを削除', onclick: deleteFrame }, '🗑');
+  const frameDelete = h('button', { class: 'frame-button', type: 'button', 'aria-label': 'このコマを削除', title: 'このコマを削除 (コマ1 は消せません)', onclick: deleteFrame }, '🗑');
+  // 案 (ルート): 切り替え・名前と説明・派生
+  const routeSelect = h('select', { class: 'input frame-route', 'aria-label': '案 (ルート)' });
+  routeSelect.addEventListener('change', () => selectRoute(routeSelect.value));
+  const routeEdit = h('button', { class: 'frame-button', type: 'button', 'aria-label': '案の名前・説明', title: '案の名前・説明を編集 / 案を削除', onclick: editRoute }, '✎');
+  const routeBranch = h('button', {
+    class: 'frame-button', type: 'button', 'aria-label': 'このコマから別の案を作る', title: 'このコマまでを共通にして、別の案 (ルート) を作る',
+    onclick: branchRoute,
+  }, '⑂', h('span', { class: 'frame-text' }, ' 派生'));
+  const routeNote = h('div', { class: 'frame-note', hidden: true });
   const framePlay = h('button', { class: 'frame-button frame-play', type: 'button', onclick: togglePlay });
   const speedSelect = h('select', { class: 'input frame-speed', 'aria-label': '再生の速さ' },
     SPEEDS.map((s) => h('option', { value: s.id }, s.label)));
@@ -467,8 +479,12 @@ export function render(root, [boardId]) {
   });
   const frameHint = h('span', { class: 'frame-hint' });
   const frameBar = h('div', { class: 'frame-bar', role: 'group', 'aria-label': 'コマ送り' },
-    h('span', { class: 'frame-title' }, '🎬', h('span', { class: 'frame-text' }, ' コマ')),
-    framePrev, frameLabel, frameNext, frameAdd, frameDelete, framePlay, speedSelect, frameHint,
+    h('div', { class: 'frame-group frame-routes' }, routeSelect, routeEdit, routeBranch),
+    h('div', { class: 'frame-group' },
+      h('span', { class: 'frame-title' }, '🎬', h('span', { class: 'frame-text' }, ' コマ')),
+      framePrev, frameLabel, frameNext, frameAdd, frameDelete, framePlay, speedSelect),
+    frameHint,
+    routeNote,
   );
 
   root.append(h('div', { class: 'board' },
@@ -544,6 +560,19 @@ export function render(root, [boardId]) {
   function updateFrameBar() {
     const count = frameCount(board);
     const playing = playback.playing;
+    // 案 (ルート)
+    const plays = board.plays ?? [];
+    const play = activePlay(board);
+    routeSelect.replaceChildren(...plays.map((p) => h('option', { value: p.id }, p.name)));
+    routeSelect.value = board.activePlayId;
+    routeSelect.disabled = playing;
+    routeEdit.disabled = playing;
+    routeBranch.disabled = playing;
+    const caption = play && (plays.length > 1 || play.note) ? `${play.name}${play.note ? `：${play.note}` : ''}` : '';
+    routeCaption.textContent = caption;
+    routeCaption.hidden = !caption;
+    routeNote.textContent = play?.note ? `${play.name}：${play.note}` : '';
+    routeNote.hidden = !play?.note;
     frameLabel.textContent = `${frame + 1} / ${count}`;
     framePrev.disabled = frame === 0 || playing;
     frameNext.disabled = frame >= count - 1 || playing;
@@ -558,6 +587,66 @@ export function render(root, [boardId]) {
     homeSelect.disabled = frame > 0;
     awaySelect.disabled = frame > 0;
     stage.classList.toggle('is-step-frame', frame > 0);
+  }
+
+  // ---- 案 (ルート) ----
+  function selectRoute(id) {
+    if (id === board.activePlayId) return;
+    playback.stop();
+    record();
+    Object.assign(board, switchPlay(board, id));
+    commit();
+  }
+
+  /** 派生: 今のコマまでを共通部分にして新しい案を作り、名前・説明を付けてもらう */
+  function branchRoute() {
+    playback.stop();
+    record();
+    Object.assign(board, branchPlay(board, frame, createId()));
+    commit();
+    showToast(`${activePlay(board).name} を作りました (コマ${frame + 1} までは共通)。この後のコマで別の動きを付けられます`, 'info', 4500);
+    editRoute();
+  }
+
+  function editRoute() {
+    playback.stop();
+    const play = activePlay(board);
+    const nameInput = h('input', { type: 'text', class: 'input', maxlength: 20, value: play.name, id: 'route-name' });
+    const noteInput = h('textarea', {
+      class: 'input route-note-input', rows: 3, maxlength: 120, id: 'route-note',
+      placeholder: '例: 相手 FW が前から来たら、右サイドに展開する',
+    }, play.note ?? '');
+    const ok = h('button', { class: 'btn btn-primary', type: 'button' }, '保存');
+    const cancel = h('button', { class: 'btn', type: 'button' }, 'キャンセル');
+    const remove = (board.plays?.length ?? 1) > 1 && h('button', { class: 'btn btn-danger', type: 'button' }, 'この案を削除');
+    const modal = openModal({
+      title: '案 (ルート) の名前・説明',
+      body: h('div', { class: 'form' },
+        h('div', { class: 'field' }, h('label', { class: 'field-label', for: 'route-name' }, '名前'), nameInput),
+        h('div', { class: 'field' }, h('label', { class: 'field-label', for: 'route-note' }, '説明 (コートの左上に表示)'), noteInput),
+      ),
+      footer: [remove, h('span', { class: 'spacer' }), cancel, ok].filter(Boolean),
+    });
+    ok.addEventListener('click', () => {
+      const name = nameInput.value.trim() || play.name;
+      const note = noteInput.value.trim();
+      modal.close();
+      if (name === play.name && note === (play.note ?? '')) return;
+      record();
+      board.plays = updatePlay(board, play.id, { name, note });
+      commit();
+    });
+    cancel.addEventListener('click', () => modal.close());
+    if (remove) {
+      remove.addEventListener('click', async () => {
+        modal.close();
+        if (!(await confirmDialog(`「${play.name}」を削除しますか? (この案のコマも消えます)`, { okLabel: '削除', danger: true }))) return;
+        record();
+        Object.assign(board, deletePlay(board, play.id));
+        commit();
+      });
+    }
+    nameInput.focus();
   }
 
   /** コマ2 以降: 前のコマからの動きを点線で表示 */
@@ -817,7 +906,10 @@ export function render(root, [boardId]) {
 
   // ---- 元に戻す / やり直し ----
   function snapshot() {
-    return { home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings, steps: board.steps ?? [] };
+    return {
+      home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings,
+      steps: board.steps ?? [], plays: syncPlays(board), activePlayId: board.activePlayId,
+    };
   }
 
   function record() {
