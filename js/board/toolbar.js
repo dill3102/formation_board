@@ -19,10 +19,9 @@ export const MODES = [
  * @param {() => void} options.onUndo
  * @param {() => void} options.onRedo
  * @param {() => void} options.onClear
- * @param {string} [options.ballSymbol] ボールの絵文字
  * @param {() => void} [options.onToggleBall]
  */
-export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onClear, ballSymbol, onToggleBall }) {
+export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onClear, onToggleBall }) {
   const state = { ...initial };
 
   // ---- モード ----
@@ -78,7 +77,7 @@ export function createToolbar({ colors, initial, onChange, onUndo, onRedo, onCle
   const clearButton = h('button', { class: 'tool-button', type: 'button', 'aria-label': '書き込みを全消去', title: '書き込みを全消去' }, '🗑');
   const ballButton = h('button', {
     class: 'tool-button', type: 'button', 'aria-label': 'ボールを出す / しまう', title: 'ボールを出す / しまう (B)', 'aria-pressed': 'false',
-  }, h('span', { class: 'tool-icon', 'aria-hidden': 'true' }, ballSymbol ?? '⚪'), h('span', { class: 'tool-label' }, 'ボール'));
+  }, h('span', { class: 'tool-icon', 'aria-hidden': 'true' }, h('span', { class: 'ball-icon' })), h('span', { class: 'tool-label' }, 'ボール'));
   ballButton.addEventListener('click', () => onToggleBall?.());
   undoButton.addEventListener('click', onUndo);
   redoButton.addEventListener('click', onRedo);

@@ -36,10 +36,10 @@ export class PieceLayer {
     this.add(id, el, x, y);
   }
 
-  /** ボール (スポーツのボールの絵文字。無ければ白丸) */
-  addBall(id, symbol, x, y) {
+  /** ボール (白丸。どのコートの色でも見えるよう縁取り付き) */
+  addBall(id, x, y) {
     const el = h('div', { class: 'piece piece-ball', dataset: { pieceId: id }, title: 'ボール' },
-      symbol ? h('span', { class: 'ball-symbol' }, symbol) : h('span', { class: 'ball-plain' }),
+      h('span', { class: 'ball-plain' }),
     );
     this.add(id, el, x, y, BALL_SIZE);
   }

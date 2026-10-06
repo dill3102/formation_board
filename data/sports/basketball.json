@@ -2,7 +2,6 @@
   "id": "basketball",
   "name": "バスケ",
   "icon": "🏀",
-  "ball": "🏀",
   "teamSize": 5,
   "court": {
     "aspect": 1.87,

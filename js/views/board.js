@@ -358,7 +358,6 @@ export function render(root, [boardId]) {
     onUndo: undo,
     onRedo: redo,
     onClear: clearDrawings,
-    ballSymbol: sport.ball,
     onToggleBall: toggleBall,
   });
 
@@ -429,7 +428,7 @@ export function render(root, [boardId]) {
       if (player) pieces.addPlayer(`p:${player.id}`, player, sport.id, f.x, f.y);
     }
     for (const m of board.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
-    if (board.ball) pieces.addBall('b:ball', sport.ball, board.ball.x, board.ball.y);
+    if (board.ball) pieces.addBall('b:ball', board.ball.x, board.ball.y);
     toolbar.setBallState(!!board.ball);
     pieces.layout();
     if (selectedId && !pieces.get(selectedId)) {
@@ -867,7 +866,10 @@ export function render(root, [boardId]) {
     } else {
       const c = viewport.screenToCourt(viewport.width / 2, viewport.height / 2);
       const inside = c.x >= 0 && c.x <= 1 && c.y >= 0 && c.y <= 1;
-      board.ball = inside ? { x: c.x, y: c.y } : { x: 0.5, y: 0.5 };
+      const ball = inside ? { x: c.x, y: c.y } : { x: 0.5, y: 0.5 };
+      // バレーはセンター = ネットの上で見えにくいので、自陣のネット手前に出す
+      if (sport.id === 'volleyball' && Math.abs(ball.x - 0.5) < 0.05) ball.x = 0.42;
+      board.ball = ball;
     }
     commit();
   }

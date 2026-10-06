@@ -2,7 +2,6 @@
   "id": "futsal",
   "name": "フットサル",
   "icon": "🥅",
-  "ball": "⚽",
   "teamSize": 5,
   "court": {
     "aspect": 2.0,

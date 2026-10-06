@@ -104,7 +104,7 @@ function showBoard(root, shared, sport) {
     if (p) pieces.addPlayer(`p:${p.id}`, p, sport.id, f.x, f.y);
   }
   for (const m of shared.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
-  if (shared.ball) pieces.addBall('b:ball', sport.ball, shared.ball.x, shared.ball.y);
+  if (shared.ball) pieces.addBall('b:ball', shared.ball.x, shared.ball.y);
 
   // ---- 描画 ----
   const ctx = canvas.getContext('2d');
