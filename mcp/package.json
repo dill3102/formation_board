@@ -1,0 +1,17 @@
+{
+  "name": "formation-board-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Formation Board の MCP サーバー (AI に配置を作らせて共有 URL を返す)",
+  "type": "module",
+  "main": "server.js",
+  "bin": { "formation-board-mcp": "server.js" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
+  }
+}

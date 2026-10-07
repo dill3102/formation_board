@@ -1,0 +1,6 @@
+{
+  "name": "formation-board",
+  "private": true,
+  "description": "Formation Board (静的サイト)。ビルドなし。この package.json は Node (mcp/) から js/ の ES Modules を読むためだけのもの",
+  "type": "module"
+}
