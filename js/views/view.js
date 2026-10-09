@@ -15,7 +15,8 @@ import { drawCourt, courtSize } from '../board/court.js';
 import { PieceLayer } from '../board/pieces.js';
 import { attachStageInput } from '../board/input.js';
 import { drawStrokes } from '../board/drawing.js';
-import { frameCount, positionsAt } from '../board/frames.js';
+import { frameCount, positionsAt, facingAt } from '../board/frames.js';
+import { drawVision } from '../board/vision.js';
 import { createPlayback, SPEEDS, pieceIdOf } from '../board/playback.js';
 import * as storage from '../storage.js';
 import { KEYS } from '../storage.js';
@@ -66,6 +67,10 @@ function showBoard(root, shared, sport) {
   viewport.flipped = settings.boardFlipped ?? false;
   const playersById = new Map(shared.players.map((p) => [p.id, p]));
   let drawingsHidden = false;
+  let visionHidden = settings.visionHidden ?? false;
+  let facing = facingAt(shared, 0); // 表示中の目線 (再生中は回っている途中の向き)
+  const hasVision = Object.keys(shared.facing ?? {}).length > 0 ||
+    (shared.plays ?? []).some((p) => p.steps.some((s) => Object.keys(s).some((k) => k.startsWith('v:'))));
 
   const canvas = h('canvas', { class: 'board-court', 'aria-hidden': 'true' });
   const pieceContainer = h('div', { class: 'board-pieces' });
@@ -83,6 +88,10 @@ function showBoard(root, shared, sport) {
       class: 'zoom-button', type: 'button', 'aria-label': '書き込みを隠す / 表示する', title: '書き込みを隠す / 表示する',
       onclick: (e) => { drawingsHidden = !drawingsHidden; e.currentTarget.classList.toggle('is-off', drawingsHidden); requestDraw(); },
     }, '👁'),
+    hasVision && h('button', {
+      class: `zoom-button${visionHidden ? ' is-off' : ''}`, type: 'button', 'aria-label': '目線を隠す / 表示する', title: '目線を隠す / 表示する',
+      onclick: (e) => { visionHidden = !visionHidden; e.currentTarget.classList.toggle('is-off', visionHidden); requestDraw(); },
+    }, '🔦'),
     h('button', {
       class: 'zoom-button', type: 'button', 'aria-label': '反転', title: '反転 (自陣を反対側に)',
       onclick: () => { viewport.setFlipped(!viewport.flipped); requestDraw(); },
@@ -162,8 +171,10 @@ function showBoard(root, shared, sport) {
   for (const m of shared.away.markers) pieces.addMarker(`m:${m.id}`, m.position, m.x, m.y);
   if (shared.ball) pieces.addBall('b:ball', shared.ball.x, shared.ball.y);
 
-  const applyPositions = (positions) => {
+  const applyPositions = (positions, nextFacing) => {
     for (const [key, [x, y]] of Object.entries(positions)) pieces.move(pieceIdOf(key), x, y);
+    facing = nextFacing;
+    requestDraw();
   };
   const playback = createPlayback({
     getBoard: () => shared,
@@ -176,7 +187,7 @@ function showBoard(root, shared, sport) {
   function showFrame(index) {
     playback.stop();
     frame = Math.max(0, Math.min(count - 1, index));
-    applyPositions(positionsAt(shared, frame));
+    applyPositions(positionsAt(shared, frame), facingAt(shared, frame));
     updateFrameBar();
   }
 
@@ -205,6 +216,13 @@ function showBoard(root, shared, sport) {
     queued = false;
     drawCourt(ctx, sport, viewport, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!visionHidden) {
+      const cones = Object.entries(facing).map(([key, deg]) => {
+        const item = pieces.get(key);
+        return item && { x: item.x, y: item.y, deg, away: key.startsWith('m:') };
+      }).filter(Boolean);
+      drawVision(ctx, cones, viewport, [courtLength, courtWidth]);
+    }
     if (!drawingsHidden) drawStrokes(ctx, shared.drawings, viewport);
     pieces.layout();
     zoomLabel.textContent = `${Math.round(viewport.zoom * 100)}%`;
@@ -295,12 +313,16 @@ function importBoard(shared, sport) {
   board.away = { templateId: null, markers: shared.away.markers.map((m) => ({ ...m, id: markerIds.get(m.id) })) };
   board.ball = shared.ball;
   board.drawings = shared.drawings.map((d) => ({ ...d, id: createId() }));
-  // コマ送り・案: 共有の ID を自分の配置の ID に付け替える
-  const mapSteps = (steps) => (steps ?? []).map((step) => Object.fromEntries(Object.entries(step).map(([key, pos]) => {
-    if (key.startsWith('p:')) return [`p:${idMap.get(key.slice(2))}`, pos];
-    if (key.startsWith('m:')) return [`m:${markerIds.get(key.slice(2))}`, pos];
-    return [key, pos];
-  })));
+  // コマ送り・案・目線: 共有の ID を自分の配置の ID に付け替える ("v:" は目線)
+  const mapKey = (key) => {
+    if (key.startsWith('v:')) return `v:${mapKey(key.slice(2))}`;
+    if (key.startsWith('p:')) return `p:${idMap.get(key.slice(2))}`;
+    if (key.startsWith('m:')) return `m:${markerIds.get(key.slice(2))}`;
+    return key;
+  };
+  const mapEntries = (obj) => Object.fromEntries(Object.entries(obj ?? {}).map(([key, value]) => [mapKey(key), value]));
+  const mapSteps = (steps) => (steps ?? []).map(mapEntries);
+  board.facing = mapEntries(shared.facing);
   const sharedPlays = shared.plays ?? [{ id: 'play-1', name: '案1', note: '', steps: shared.steps ?? [] }];
   const playIds = new Map(sharedPlays.map((p) => [p.id, createId()]));
   board.plays = sharedPlays.map((p) => ({ id: playIds.get(p.id), name: p.name, note: p.note ?? '', steps: mapSteps(p.steps) }));

@@ -27,7 +27,9 @@ import { createDetailCard } from '../board/detail-card.js';
 import {
   frameCount, positionsAt, setStepPosition, insertFrame, removeFrame, pruneSteps, movesInto,
   ensurePlays, syncPlays, activePlay, switchPlay, branchPlay, deletePlay, updatePlay,
+  facingAt, setFacing, pruneFacing,
 } from '../board/frames.js';
+import { drawVision, handlePosition, angleBetween } from '../board/vision.js';
 import { createPlayback, SPEEDS, pieceIdOf, frameKeyOf } from '../board/playback.js';
 import { makeDraggable } from '../board/drag-ghost.js';
 import { shortcutTable } from './help.js';
@@ -99,6 +101,8 @@ export function render(root, [boardId]) {
   let attendanceFilter = settings.boardAttendanceFilter ?? 'all';
   let selectedId = null; // 選択中の駒ID ("p:<選手ID>" / "m:<マーカーID>")
   let frame = 0; // 表示・編集中のコマ (0 = コマ1 = 配置そのもの)
+  let liveFacing = null; // 再生中の目線 (コマの間で回っている途中の向き)
+  let draggingPiece = false;
 
   /** 描いている途中の書き込み */
   let current = null;
@@ -138,6 +142,7 @@ export function render(root, [boardId]) {
   function commit() {
     board.home = pruneGuests(board.home);
     if (board.steps?.length) board.steps = pruneSteps(board);
+    if (board.facing) board.facing = pruneFacing(board);
     frame = Math.min(frame, frameCount(board) - 1);
     scheduleSave();
     renderAll();
@@ -390,7 +395,24 @@ export function render(root, [boardId]) {
   const flipButton = h('button', { class: 'zoom-button', type: 'button', onclick: flip }, '⇅');
   const maximizeButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setMaximized(!maximized) });
   const drawingsButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setDrawingsHidden(!drawingsHidden) }, '👁');
-  zoomControls.append(rotateButton, flipButton, drawingsButton, maximizeButton);
+  const visionButton = h('button', { class: 'zoom-button', type: 'button', onclick: () => setVisionHidden(!visionHidden) }, '🔦');
+  zoomControls.append(rotateButton, flipButton, drawingsButton, visionButton, maximizeButton);
+
+  // 目線 (ライト) の表示 ON/OFF。選んだ状態は次も使う
+  let visionHidden = settings.visionHidden ?? false;
+  function setVisionHidden(hidden) {
+    visionHidden = hidden;
+    updateSettings({ visionHidden: hidden });
+    updateVisionButton();
+    requestDraw();
+  }
+  function updateVisionButton() {
+    const label = visionHidden ? '目線を表示する (G)' : '目線を隠す (G)';
+    visionButton.setAttribute('aria-label', label);
+    visionButton.title = label;
+    visionButton.setAttribute('aria-pressed', String(visionHidden));
+    visionButton.classList.toggle('is-off', visionHidden);
+  }
 
   // 書き込みの表示 ON/OFF (配置だけ見たい時)。選んだ状態は次も使う
   let drawingsHidden = settings.drawingsHidden ?? false;
@@ -436,7 +458,11 @@ export function render(root, [boardId]) {
     flipButton.setAttribute('aria-pressed', String(viewport.flipped));
   }
   const routeCaption = h('div', { class: 'route-caption', hidden: true, 'aria-live': 'polite' });
-  const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, routeCaption, detailCard.el, zoomControls);
+  // 目線の向きを変えるつまみ (選んでいる駒に目線がある時だけ出す)
+  const visionHandle = h('div', {
+    class: 'vision-handle', hidden: true, dataset: { stageIgnore: '' }, title: 'ドラッグで目線の向きを変える', 'aria-label': '目線の向き',
+  }, '⟲');
+  const stage = h('div', { class: 'board-stage' }, canvas, pieceContainer, visionHandle, routeCaption, detailCard.el, zoomControls);
 
   // ---- ベンチ ----
   const benchList = h('div', { class: 'bench-list' });
@@ -501,14 +527,17 @@ export function render(root, [boardId]) {
 
   const playback = createPlayback({
     getBoard: () => board,
-    apply: (positions) => {
+    apply: (positions, facing) => {
       for (const [key, [x, y]] of Object.entries(positions)) pieces.move(pieceIdOf(key), x, y);
+      liveFacing = facing;
+      requestDraw();
     },
     onFrame: (index) => {
       frame = index;
       updateFrameBar();
     },
     onStateChange: (playing) => {
+      if (!playing) liveFacing = null;
       updateFrameBar();
       if (!playing) renderPieces();
       requestDraw();
@@ -863,12 +892,99 @@ export function render(root, [boardId]) {
     renderQueued = false;
     drawCourt(ctx, sport, viewport, dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!visionHidden) drawVision(ctx, visionCones(), viewport, [courtLength, courtWidth]);
     if (!drawingsHidden) drawStrokes(ctx, board.drawings, viewport);
     if (current) drawStroke(ctx, current, viewport);
     if (frame > 0 && !playback.playing) drawMoves();
     pieces.layout();
+    placeVisionHandle();
     zoomLabel.textContent = `${Math.round(viewport.zoom * 100)}%`;
   }
+
+  // ---- 目線 (ライト) ----
+  function currentFacing() {
+    return liveFacing ?? facingAt(board, frame);
+  }
+
+  /** 光を描く駒: 今の駒の位置 (ドラッグ中・再生中も) と目線 */
+  function visionCones() {
+    const cones = [];
+    for (const [key, deg] of Object.entries(currentFacing())) {
+      const item = pieces.get(key);
+      if (item) cones.push({ x: item.x, y: item.y, deg, away: key.startsWith('m:'), selected: key === selectedId });
+    }
+    return cones;
+  }
+
+  function placeVisionHandle() {
+    const deg = selectedId ? currentFacing()[selectedId] : undefined;
+    const item = selectedId && pieces.get(selectedId);
+    const show = deg !== undefined && item && !visionHidden && !playback.playing && !draggingPiece;
+    visionHandle.hidden = !show;
+    if (!show) return;
+    const p = handlePosition({ x: item.x, y: item.y, deg }, viewport, [courtLength, courtWidth]);
+    visionHandle.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
+  }
+
+  function changeFacing(key, deg) {
+    Object.assign(board, setFacing(board, frame, key, deg));
+  }
+
+  /** 目線を付ける時の向き: ボールがあればボールの方、無ければ 自チーム = 相手ゴール / 敵 = 自陣ゴール */
+  function defaultFacing(key) {
+    const item = pieces.get(key);
+    const ball = pieces.get('b:ball');
+    if (item && ball && Math.hypot(ball.x - item.x, ball.y - item.y) > 0.005) {
+      return angleBetween(item, ball, [courtLength, courtWidth]);
+    }
+    return key.startsWith('m:') ? 180 : 0;
+  }
+
+  /** 詳細カードの「目線」ボタン (コート上の選手・敵マーカーだけ) */
+  function visionAction(key) {
+    if (!pieces.get(key)) return [];
+    const has = currentFacing()[key] !== undefined;
+    return [{
+      label: has ? '🔦 目線を消す' : '🔦 目線',
+      onClick: () => {
+        record();
+        changeFacing(key, has ? null : defaultFacing(key));
+        if (!has && visionHidden) setVisionHidden(false);
+        commit();
+        onTapPiece(key);
+      },
+    }];
+  }
+
+  // つまみのドラッグで向きを変える
+  let visionDrag = null;
+  visionHandle.addEventListener('pointerdown', (e) => {
+    if (!selectedId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    visionHandle.setPointerCapture(e.pointerId);
+    playback.stop();
+    record();
+    visionDrag = { id: e.pointerId, key: selectedId };
+    visionHandle.classList.add('is-dragging');
+  });
+  visionHandle.addEventListener('pointermove', (e) => {
+    if (visionDrag?.id !== e.pointerId) return;
+    const item = pieces.get(visionDrag.key);
+    if (!item) return;
+    const r = stage.getBoundingClientRect();
+    const target = viewport.screenToCourt(e.clientX - r.left, e.clientY - r.top);
+    changeFacing(visionDrag.key, angleBetween(item, target, [courtLength, courtWidth]));
+    requestDraw();
+  });
+  const endVisionDrag = (e) => {
+    if (visionDrag?.id !== e.pointerId) return;
+    visionDrag = null;
+    visionHandle.classList.remove('is-dragging');
+    commit();
+  };
+  visionHandle.addEventListener('pointerup', endVisionDrag);
+  visionHandle.addEventListener('pointercancel', endVisionDrag);
 
   // requestAnimationFrame でまとめて描く。タブが裏にある等で rAF が止まっている時のために setTimeout も併用
   function requestDraw() {
@@ -907,7 +1023,7 @@ export function render(root, [boardId]) {
   // ---- 元に戻す / やり直し ----
   function snapshot() {
     return {
-      home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings,
+      home: board.home, away: board.away, ball: board.ball ?? null, drawings: board.drawings, facing: board.facing ?? {},
       steps: board.steps ?? [], plays: syncPlays(board), activePlayId: board.activePlayId,
     };
   }
@@ -1158,7 +1274,8 @@ export function render(root, [boardId]) {
       onTap: () => {
         selectedId = `p:${player.id}`;
         pieces.select(selectedId);
-        showPlayerCard(player, frame > 0 ? [] : playerActions(player));
+        showPlayerCard(player, [...visionAction(selectedId), ...(frame > 0 ? [] : playerActions(player))]);
+        requestDraw();
       },
     });
   }
@@ -1275,12 +1392,12 @@ export function render(root, [boardId]) {
       detailCard.hide();
     } else if (id.startsWith('p:')) {
       const player = playerOf(id.slice(2));
-      if (player) showPlayerCard(player, frame > 0 ? [] : playerActions(player));
+      if (player) showPlayerCard(player, [...visionAction(id), ...(frame > 0 ? [] : playerActions(player))]);
     } else if (id.startsWith('m:')) {
       const marker = markerById(id.slice(2));
       detailCard.showMarker({
         marker, sport,
-        actions: frame > 0 ? [] : [{
+        actions: [...visionAction(id), ...(frame > 0 ? [] : [{
           label: '削除',
           onClick: () => {
             record();
@@ -1288,11 +1405,12 @@ export function render(root, [boardId]) {
             detailCard.hide();
             commit();
           },
-        }],
+        }])],
       });
     } else {
       detailCard.hide();
     }
+    requestDraw(); // 選んだ駒の光を濃く・つまみを出す
   }
 
   const detach = attachStageInput(stage, {
@@ -1308,6 +1426,7 @@ export function render(root, [boardId]) {
       selectedId = id;
       pieces.select(id);
       pieces.setDragging(id, true);
+      draggingPiece = true;
       if (id.startsWith('p:')) {
         const player = playerOf(id.slice(2));
         if (player) showPlayerCard(player, null);
@@ -1318,9 +1437,11 @@ export function render(root, [boardId]) {
     onPieceDrag: (id, sx, sy) => {
       const c = viewport.screenToCourt(sx, sy);
       pieces.move(id, clampCourt(c.x), clampCourt(c.y));
+      if (currentFacing()[id] !== undefined) requestDraw(); // 光も一緒に動かす
     },
     onPieceDragEnd: (id, px, py) => {
       pieces.setDragging(id, false);
+      draggingPiece = false;
       detailCard.hide();
       const r = stage.getBoundingClientRect();
       const cx = r.left + px;
@@ -1445,6 +1566,8 @@ export function render(root, [boardId]) {
       setMaximized(!maximized);
     } else if (!mod && !e.altKey && e.key.toLowerCase() === 'w') {
       setDrawingsHidden(!drawingsHidden);
+    } else if (!mod && !e.altKey && e.key.toLowerCase() === 'g') {
+      setVisionHidden(!visionHidden);
     } else if (!mod && !e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
       e.preventDefault();
       setFrame(frame + (e.key === 'ArrowRight' ? 1 : -1));
@@ -1481,6 +1604,7 @@ export function render(root, [boardId]) {
   observer.observe(stage);
   updateCursor();
   updateDrawingsButton();
+  updateVisionButton();
   setMaximized(false);
   renderAll();
   resize();

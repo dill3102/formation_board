@@ -66,14 +66,23 @@ export function toShareData(board, sport, playerOf) {
     });
   }
   // コマ送り: 各コマ = [種類, 番号, x, y, …] (種類 0 = h の行 / 1 = 敵マーカー a / 2 = ボール)
+  //   目線は [3 (h の行) or 4 (敵マーカー), 番号, 度 (-1 = 目線なし), 0]
   const refs = {};
   board.home.slots.forEach((s, i) => { if (s.playerId) refs[`p:${s.playerId}`] = [0, i]; });
   board.home.free.forEach((f, j) => { refs[`p:${f.playerId}`] = [0, board.home.slots.length + j]; });
   board.away.markers.forEach((m, k) => { refs[`m:${m.id}`] = [1, k]; });
   refs.b = [2, 0];
-  const encodeSteps = (steps) => steps.map((step) => Object.entries(step)
-    .filter(([key]) => refs[key])
-    .flatMap(([key, [x, y]]) => [...refs[key], q(x), q(y)]));
+  const facingRef = (key) => (refs[key] && key !== 'b' ? refs[key] : null);
+  // 目線 (コマ1): g = [種類 (0 = h の行 / 1 = 敵マーカー), 番号, 度, …]
+  const facing = Object.entries(board.facing ?? {}).filter(([key]) => facingRef(key));
+  if (facing.length) data.g = facing.flatMap(([key, deg]) => [...facingRef(key), Math.round(deg)]);
+  const encodeSteps = (steps) => steps.map((step) => Object.entries(step).flatMap(([key, value]) => {
+    if (key.startsWith('v:')) {
+      const ref = facingRef(key.slice(2));
+      return ref ? [ref[0] + 3, ref[1], value === null ? -1 : Math.round(value), 0] : [];
+    }
+    return refs[key] ? [...refs[key], q(value[0]), q(value[1])] : [];
+  }));
   // 案 (ルート) が複数ある・説明がある時は r = [[名前, 説明, コマ], …]、ri = 表示中の案の番号
   const plays = board.plays?.length
     ? board.plays.map((p) => (p.id === board.activePlayId ? { ...p, steps: board.steps ?? [] } : p))
@@ -143,11 +152,24 @@ export function fromShareData(data, sport) {
     if (text !== null) stroke.text = text;
     return stroke;
   });
+  // 種類 0 = h の行 / 1 = 敵マーカー → 駒のキー
+  const keyOf = (type, index) => (type === 0 ? rowKeys[index] : type === 1 && away.markers[index] ? `m:m${index}` : null);
+  const facing = {};
+  const g = data.g ?? [];
+  for (let k = 0; k + 2 < g.length; k += 3) {
+    const key = keyOf(g[k], g[k + 1]);
+    if (key) facing[key] = g[k + 2];
+  }
   const decodeSteps = (list) => (list ?? []).map((flat) => {
     const step = {};
     for (let k = 0; k + 3 < flat.length; k += 4) {
       const [type, index, x, y] = flat.slice(k, k + 4);
-      const key = type === 0 ? rowKeys[index] : type === 1 ? `m:m${index}` : 'b';
+      if (type === 3 || type === 4) {
+        const target = keyOf(type - 3, index);
+        if (target) step[`v:${target}`] = x < 0 ? null : x;
+        continue;
+      }
+      const key = type === 2 ? 'b' : keyOf(type, index);
       if (key) step[key] = [uq(x), uq(y)];
     }
     return step;
@@ -165,6 +187,7 @@ export function fromShareData(data, sport) {
     away,
     ball: data.b ? { x: uq(data.b[0]), y: uq(data.b[1]) } : null,
     drawings,
+    facing,
     plays,
     activePlayId: active.id,
     steps: active.steps,

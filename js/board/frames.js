@@ -6,6 +6,10 @@
 //     step = { "p:<選手ID>": [x, y], "m:<マーカーID>": [x, y], "b": [x, y] }
 //   書いていない駒は、前のコマの位置のまま
 // 空き枠 (点線の丸) は動かさない
+//
+// 目線 (向き): board.facing = { "p:<選手ID>": 度, "m:<マーカーID>": 度 } (コマ1)
+//   コマ2 以降は step に "v:<駒のキー>": 度 (null = このコマから目線なし)
+//   度はコートの実寸で測る: 0 = 相手ゴールの方向 (x+)、90 = 相手ゴールを向いて右 (y+)
 
 /** コマの数 (1 以上) */
 export function frameCount(board) {
@@ -28,7 +32,7 @@ export function positionsAt(board, index) {
   const steps = board.steps ?? [];
   for (let i = 0; i < Math.min(index, steps.length); i++) {
     for (const [key, pos] of Object.entries(steps[i])) {
-      if (key in map) map[key] = pos; // 配置から外れた駒の位置は無視
+      if (key in map && Array.isArray(pos)) map[key] = pos; // 配置から外れた駒の位置は無視
     }
   }
   return map;
@@ -69,12 +73,77 @@ export function removeFrame(board, index) {
 export function pruneSteps(board) {
   if (!board.steps?.length) return board.steps ?? [];
   const valid = basePositions(board);
-  return board.steps.map((s) => Object.fromEntries(Object.entries(s).filter(([key]) => key in valid)));
+  return board.steps.map((s) => Object.fromEntries(Object.entries(s)
+    .filter(([key]) => key in valid || (key.startsWith('v:') && key.slice(2) in valid && key !== 'v:b'))));
+}
+
+// ---- 目線 (向き) ----
+
+/** コマ1 の目線のうち、コート上にいる駒 (ボール以外) の分 */
+export function pruneFacing(board) {
+  const valid = basePositions(board);
+  return Object.fromEntries(Object.entries(board.facing ?? {}).filter(([key]) => key in valid && key !== 'b'));
+}
+
+/** コマ index (0 始まり) での目線 { 駒のキー: 度 } */
+export function facingAt(board, index) {
+  const valid = basePositions(board);
+  const map = pruneFacing(board);
+  const steps = board.steps ?? [];
+  for (let i = 0; i < Math.min(index, steps.length); i++) {
+    for (const [key, deg] of Object.entries(steps[i])) {
+      if (!key.startsWith('v:')) continue;
+      const target = key.slice(2);
+      if (!(target in valid) || target === 'b') continue;
+      if (deg === null) delete map[target];
+      else map[target] = deg;
+    }
+  }
+  return map;
+}
+
+/** 目線を変える (deg = null で消す) → { facing, steps }。コマ1 は facing、コマ2 以降は step に記録 */
+export function setFacing(board, index, key, deg) {
+  const value = deg === null ? null : normalizeDeg(deg);
+  if (index === 0) {
+    const facing = { ...(board.facing ?? {}) };
+    if (value === null) delete facing[key];
+    else facing[key] = value;
+    return { facing, steps: board.steps ?? [] };
+  }
+  const steps = (board.steps ?? []).map((s) => ({ ...s }));
+  const step = steps[index - 1];
+  if (!step) return { facing: board.facing ?? {}, steps };
+  const prev = facingAt({ ...board, steps }, index - 1)[key] ?? null;
+  if (prev === value) delete step[`v:${key}`];
+  else step[`v:${key}`] = value;
+  return { facing: board.facing ?? {}, steps };
+}
+
+/** 0〜359 の整数 */
+export function normalizeDeg(deg) {
+  return ((Math.round(deg) % 360) + 360) % 360;
+}
+
+/** 2つのコマの間の目線。近い方へ回る。片方にしか無い目線はそのまま */
+export function interpolateFacing(from, to, t) {
+  const e = ease(t);
+  const result = {};
+  for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+    const a = from[key];
+    const b = to[key];
+    if (a === undefined) result[key] = b;
+    else if (b === undefined) { if (t < 1) result[key] = a; }
+    else result[key] = a + ((((b - a) % 360) + 540) % 360 - 180) * e;
+  }
+  return result;
 }
 
 /** 2つのコマの間 (t = 0〜1) の位置。なめらかに加速・減速 (ease in-out) */
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
 export function interpolate(from, to, t) {
-  const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+  const e = ease(t);
   const result = {};
   for (const key of Object.keys(from)) {
     const a = from[key];

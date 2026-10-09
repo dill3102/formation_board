@@ -20,7 +20,9 @@ import { toShareData, fromShareData, encodeShare, decodeShare } from '../js/shar
 import {
   frameCount, positionsAt, setStepPosition, insertFrame, removeFrame, pruneSteps, interpolate, movesInto,
   ensurePlays, syncPlays, switchPlay, branchPlay, deletePlay, updatePlay,
+  facingAt, setFacing, pruneFacing, interpolateFacing,
 } from '../js/board/frames.js';
+import { angleBetween, facingPoint, visionLength } from '../js/board/vision.js';
 
 const tests = [];
 const test = (name, fn) => tests.push({ name, fn });
@@ -692,6 +694,15 @@ test('share: 案 (ルート) も往復できる (名前・説明・それぞれ�
   assertEqual(shared.activePlayId, 'play-2');
   assertEqual(shared.steps, [{ b: [0.6, 0.6] }, { 'p:s1': [0.4, 0.4] }]);
 });
+test('share: 目線 (コマ1・コマの中・消す) も往復できる', async () => {
+  const { board, playerOf } = shareBoard();
+  board.facing = { 'p:a': 0, 'm:m': 180 };
+  board.steps = [{ 'v:p:a': 45, 'v:p:b': 270 }, { 'v:m:m': null }];
+  const shared = fromShareData(await decodeShare(await encodeShare(toShareData(board, shareSport, playerOf))), shareSport);
+  assertEqual(shared.facing, { 'p:s0': 0, 'm:m0': 180 });
+  assertEqual(shared.steps, [{ 'v:p:s0': 45, 'v:p:s1': 270 }, { 'v:m:m0': null }]);
+  assertEqual(facingAt(shared, 2), { 'p:s0': 45, 'p:s1': 270 });
+});
 test('share: 壊れた文字列はエラー', async () => {
   let failed = false;
   try {
@@ -700,6 +711,58 @@ test('share: 壊れた文字列はエラー', async () => {
     failed = true;
   }
   assertEqual(failed, true);
+});
+
+// --- 目線 (ライト) ---
+function facingBoard() {
+  return {
+    home: { slots: [{ position: 'FW', x: 0.5, y: 0.5, playerId: 'a' }], free: [{ playerId: 'b', x: 0.3, y: 0.3 }], bench: ['c'] },
+    away: { markers: [{ id: 'm', position: 'GK', x: 0.9, y: 0.5 }] },
+    ball: { x: 0.6, y: 0.5 },
+    facing: { 'p:a': 0, 'm:m': 180 },
+    steps: [{}, {}],
+  };
+}
+test('facing: コマ1 は facing、コマ2 以降は step の v: に記録。前と同じ向きなら記録しない', () => {
+  const board = facingBoard();
+  Object.assign(board, setFacing(board, 0, 'p:b', 90));
+  assertEqual(board.facing, { 'p:a': 0, 'm:m': 180, 'p:b': 90 });
+  Object.assign(board, setFacing(board, 1, 'p:a', -30));
+  assertEqual(board.steps[0], { 'v:p:a': 330 });
+  Object.assign(board, setFacing(board, 2, 'p:a', 330));
+  assertEqual(board.steps[1], {});
+  Object.assign(board, setFacing(board, 2, 'm:m', null));
+  assertEqual(board.steps[1], { 'v:m:m': null });
+  assertEqual(facingAt(board, 0), { 'p:a': 0, 'm:m': 180, 'p:b': 90 });
+  assertEqual(facingAt(board, 1), { 'p:a': 330, 'm:m': 180, 'p:b': 90 });
+  assertEqual(facingAt(board, 2), { 'p:a': 330, 'p:b': 90 });
+  Object.assign(board, setFacing(board, 0, 'p:b', null));
+  assertEqual(board.facing, { 'p:a': 0, 'm:m': 180 });
+});
+test('facing: ベンチ・外した駒の目線は消える (位置のコマ送りはそのまま)', () => {
+  const board = facingBoard();
+  board.facing['p:c'] = 10; // ベンチ
+  board.facing.b = 0; // ボールには目線なし
+  board.steps = [{ 'v:p:c': 20, 'v:p:a': 30, 'p:a': [0.6, 0.5], 'v:b': 5 }];
+  assertEqual(pruneFacing(board), { 'p:a': 0, 'm:m': 180 });
+  assertEqual(pruneSteps(board), [{ 'v:p:a': 30, 'p:a': [0.6, 0.5] }]);
+  assertEqual(positionsAt(board, 1)['p:a'], [0.6, 0.5]);
+});
+test('facing: 再生中は近い方へ回る (350° → 10° は 0° を通る)', () => {
+  assertEqual(interpolateFacing({ a: 350 }, { a: 10 }, 0.5), { a: 360 });
+  assertEqual(interpolateFacing({ a: 10 }, { a: 350 }, 0.5), { a: 0 });
+  assertEqual(interpolateFacing({ a: 0 }, { b: 90 }, 0.5), { a: 0, b: 90 });
+  assertEqual(interpolateFacing({ a: 0 }, {}, 1), {});
+});
+test('vision: 向きはコートの実寸で測る (縦横比が違っても 45° は斜め45°)', () => {
+  const size = [105, 68];
+  assertEqual(angleBetween({ x: 0.5, y: 0.5 }, { x: 0.6, y: 0.5 }, size), 0);
+  assertEqual(angleBetween({ x: 0.5, y: 0.5 }, { x: 0.5, y: 0.6 }, size), 90);
+  assertEqual(angleBetween({ x: 0.5, y: 0.5 }, { x: 0.4, y: 0.5 }, size), 180);
+  assertEqual(angleBetween({ x: 0.5, y: 0.5 }, { x: 0.5 + 10 / 105, y: 0.5 - 10 / 68 }, size), 315);
+  const p = facingPoint(0.5, 0.5, 90, visionLength(105), size);
+  assertEqual([Math.round(p.x * 1000), Math.round((p.y - 0.5) * 68 * 10)], [500, Math.round(105 * 0.16 * 10)]);
+  assertEqual(visionLength(18), 3); // 小さいコートでも最低 3m
 });
 
 // --- PWA ---

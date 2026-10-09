@@ -49,19 +49,23 @@ server.registerTool('list_sports', {
 
 // ---- create_board ----
 const point = z.tuple([z.number(), z.number()]);
+const facingSchema = z.union([z.number(), z.literal('ball'), z.null()])
+  .describe('目線 (向き): 度 (0 = 相手ゴールの方向、90 = 相手ゴールを向いて右、180 = 自陣ゴールの方向、270 = 左) / "ball" = ボールの方 / null = 目線なし。扇形のライトで表示される');
 const playerSchema = z.object({
   name: z.string().describe('選手の名前'),
   number: z.union([z.string(), z.number()]).optional().describe('背番号'),
   position: z.string().optional().describe('ポジション id (list_sports の positions。例: GK, DF, PG)'),
   x: z.number().optional().describe('座標 x。省略するとフォーメーションの枠に自動で入る'),
   y: z.number().optional().describe('座標 y'),
+  facing: facingSchema.optional(),
 });
 const moveSchema = z.object({
   target: z.string().describe('動かす対象: 自チームの選手名 / "#背番号" (例 "#10") / "away:番号" (敵マーカー。0 始まり、フォーメーションの分が先) / "ball"'),
-  x: z.number(),
-  y: z.number(),
+  x: z.number().optional().describe('このコマでの位置 x (向きだけ変える時は省略)'),
+  y: z.number().optional(),
+  facing: facingSchema.optional().describe('このコマでの目線 ("ball" はこのコマのボールの方)。省略すると前のコマのまま'),
 });
-const frameSchema = z.object({ moves: z.array(moveSchema).describe('このコマで位置が変わる駒 (書かない駒は前のコマのまま)') });
+const frameSchema = z.object({ moves: z.array(moveSchema).describe('このコマで位置・目線が変わる駒 (書かない駒は前のコマのまま)') });
 
 server.registerTool('create_board', {
   title: '配置を作って共有 URL を返す',
@@ -72,6 +76,7 @@ server.registerTool('create_board', {
     ' フォーメーションを指定すると、座標を省略した選手はポジションに合う枠へ自動で入る。',
     ' コマ送り: frames (または routes[].frames) の1つ目がコマ2。各コマには動いた駒だけを書く。',
     ' 案: routes で「案1 = …、案2 = …」のように同じ開始配置から別々の動きを作れる (note に説明を書くとコートの左上に表示される)。',
+    ' 目線: facing で選手・敵の向いている方向を扇形のライトで表示できる (例: 全員ボールを見る = home.facing: "ball")。コマごとに向きを変えると再生で首を振る。',
   ].join(''),
   inputSchema: {
     sport: z.string().describe('スポーツ id (soccer / basketball / futsal / volleyball)'),
@@ -80,11 +85,13 @@ server.registerTool('create_board', {
     home: z.object({
       formation: z.string().optional().describe('自チームのフォーメーション id (例: 4-4-2)。list_sports で確認'),
       players: z.array(playerSchema).optional().describe('コート上の自チームの選手'),
-      bench: z.array(playerSchema.omit({ x: true, y: true })).optional().describe('ベンチの選手'),
+      bench: z.array(playerSchema.omit({ x: true, y: true, facing: true })).optional().describe('ベンチの選手'),
+      facing: facingSchema.optional().describe('自チーム全員の目線 (各選手の facing が優先)'),
     }).optional(),
     away: z.object({
       formation: z.string().optional().describe('敵のフォーメーション id (自チームと反対側に並ぶ)'),
-      markers: z.array(z.object({ position: z.string(), x: z.number(), y: z.number() })).optional().describe('敵マーカーを個別に置く'),
+      markers: z.array(z.object({ position: z.string(), x: z.number(), y: z.number(), facing: facingSchema.optional() })).optional().describe('敵マーカーを個別に置く'),
+      facing: facingSchema.optional().describe('敵全員の目線 (各マーカーの facing が優先)'),
     }).optional(),
     ball: z.object({ x: z.number(), y: z.number() }).optional().describe('ボールの位置'),
     drawings: z.array(z.object({
@@ -110,7 +117,7 @@ server.registerTool('create_board', {
       `共有 URL: ${url}`,
       '',
       `「${board.name}」(${spec.sport}) — 自チーム ${onCourt}人 / ベンチ ${board.home.bench.length}人 / 敵 ${board.away.markers.length} / ` +
-        `ボール ${board.ball ? 'あり' : 'なし'} / 書き込み ${board.drawings.length} / ` +
+        `ボール ${board.ball ? 'あり' : 'なし'} / 書き込み ${board.drawings.length} / 目線 ${Object.keys(board.facing).length} / ` +
         `案 ${board.plays.length} (コマ ${board.plays.map((p) => p.steps.length + 1).join(', ')})`,
       'URL を開くと見るだけの画面になります。「自分の配置として保存」で自分のボードに取り込めます (名簿に同じ名前の選手がいればその選手につながります)。',
     ];

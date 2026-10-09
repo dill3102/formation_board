@@ -1,6 +1,6 @@
 // コマ送りの再生 (配置ボードと共有の見るだけ画面で共通)
 // コマ i → i+1 の間を、駒の位置を少しずつ動かして見せる
-import { positionsAt, frameCount, interpolate } from './frames.js';
+import { positionsAt, facingAt, frameCount, interpolate, interpolateFacing } from './frames.js';
 
 export const SPEEDS = [
   { id: 'slow', label: 'ゆっくり', ms: 1600 },
@@ -29,7 +29,7 @@ function nextTick(fn) {
 /**
  * @param {object} options
  * @param {() => object} options.getBoard 再生する配置 (home / away / ball / steps)
- * @param {(positions: Record<string, [number, number]>) => void} options.apply 駒を動かす
+ * @param {(positions: Record<string, [number, number]>, facing: Record<string, number>) => void} options.apply 駒を動かす (facing = 目線)
  * @param {(index: number) => void} options.onFrame コマが変わった時
  * @param {(playing: boolean) => void} options.onStateChange 再生 / 停止が変わった時
  * @param {() => number} options.getSpeedMs
@@ -43,13 +43,15 @@ export function createPlayback({ getBoard, apply, onFrame, onStateChange, getSpe
     onStateChange(value);
   }
 
+  const stateAt = (board, index) => ({ positions: positionsAt(board, index), facing: facingAt(board, index) });
+
   function animate(from, to, ms, myToken) {
     return new Promise((resolve) => {
       const start = performance.now();
       const step = () => {
         if (myToken !== token) return resolve(false);
         const t = Math.min(1, (performance.now() - start) / ms);
-        apply(interpolate(from, to, t));
+        apply(interpolate(from.positions, to.positions, t), interpolateFacing(from.facing, to.facing, t));
         if (t < 1) nextTick(step);
         else setTimeout(() => resolve(myToken === token), PAUSE_MS);
       };
@@ -70,11 +72,12 @@ export function createPlayback({ getBoard, apply, onFrame, onStateChange, getSpe
       let index = current >= count - 1 ? 0 : current;
       if (index !== current) {
         onFrame(index);
-        apply(positionsAt(board, index));
+        const state = stateAt(board, index);
+        apply(state.positions, state.facing);
         await new Promise((r) => setTimeout(r, PAUSE_MS));
       }
       while (index < count - 1) {
-        const ok = await animate(positionsAt(board, index), positionsAt(board, index + 1), getSpeedMs(), myToken);
+        const ok = await animate(stateAt(board, index), stateAt(board, index + 1), getSpeedMs(), myToken);
         if (!ok) return false;
         index++;
         onFrame(index);

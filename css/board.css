@@ -1276,3 +1276,44 @@ body.board-maximized .route-caption {
     font-size: 0.8rem;
   }
 }
+
+/* ---- 目線 (ライト): 向きを変えるつまみ ---- */
+.vision-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #f5b400;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  color: #8a6400;
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+.vision-handle[hidden] {
+  display: none;
+}
+
+.vision-handle.is-dragging {
+  cursor: grabbing;
+  background: #fff6cc;
+}
+
+/* タッチは指で掴みやすいよう大きく */
+@media (pointer: coarse) {
+  .vision-handle {
+    width: 38px;
+    height: 38px;
+    font-size: 19px;
+  }
+}

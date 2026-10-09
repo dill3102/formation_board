@@ -5,7 +5,9 @@ import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { SPORT_IDS } from '../js/sports.js';
 import { toShareData, fromShareData } from '../js/share.js';
 import { assignPlayersToSlots, mirrorSlots } from '../js/board/formation.js';
-import { positionsAt, frameCount } from '../js/board/frames.js';
+import { positionsAt, facingAt, frameCount, normalizeDeg } from '../js/board/frames.js';
+import { angleBetween } from '../js/board/vision.js';
+import { courtSize } from '../js/board/court.js';
 
 const SPORTS_DIR = new URL('../data/sports/', import.meta.url);
 
@@ -127,18 +129,67 @@ export function buildBoard(spec, sports = loadSports()) {
       : allPlayers.find((p) => p.name === t);
     return player ? `p:${player.id}` : null;
   };
-  const buildSteps = (frames, label) => (frames ?? []).map((frame, i) => {
-    const step = {};
-    for (const move of frame.moves ?? []) {
-      const key = keyForTarget(move.target);
-      if (!key) {
-        warnings.push(`${label} コマ${i + 2}: 動かす対象 "${move.target}" が見つかりません`);
-        continue;
+  // ---- 目線 (向き) ----
+  // facing: 度 (0 = 相手ゴールの方向、90 = 相手ゴールを向いて右) / "ball" = ボールの方 / null = 目線なし
+  const size = courtSize(sport);
+  const resolveFacing = (value, key, positions, where) => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return normalizeDeg(value);
+    if (String(value).toLowerCase() === 'ball' || value === 'ボール') {
+      const [from, ball] = [positions[key], positions.b];
+      if (from && ball && (from[0] !== ball[0] || from[1] !== ball[1])) {
+        return angleBetween({ x: from[0], y: from[1] }, { x: ball[0], y: ball[1] }, size);
       }
-      step[key] = [round(clamp(move.x)), round(clamp(move.y))];
+      warnings.push(`${where}: ボールが無いので、目線 "ball" は付けませんでした`);
+      return undefined;
     }
-    return step;
-  });
+    warnings.push(`${where}: 目線 "${value}" が分かりません (度の数字 か "ball")`);
+    return undefined;
+  };
+  const facing = {};
+  {
+    const base = positionsAt({ home, away, ball, steps: [] }, 0);
+    const setBase = (key, value, where) => {
+      const deg = resolveFacing(value, key, base, where);
+      if (deg !== undefined && deg !== null) facing[key] = deg;
+    };
+    const awayOffset = markers.length - (awaySpec.markers ?? []).length;
+    players.forEach(({ spec: p, id }) => {
+      const key = `p:${id}`;
+      if (!(key in base)) return; // ベンチ
+      setBase(key, p.facing ?? homeSpec.facing, p.name);
+    });
+    markers.forEach((m, i) => {
+      const own = i >= awayOffset ? awaySpec.markers[i - awayOffset].facing : undefined;
+      setBase(`m:${m.id}`, own ?? awaySpec.facing, `敵 ${i}`);
+    });
+  }
+
+  const buildSteps = (frames, label) => {
+    const steps = [];
+    (frames ?? []).forEach((frame, i) => {
+      const step = {};
+      const facingMoves = [];
+      for (const move of frame.moves ?? []) {
+        const key = keyForTarget(move.target);
+        if (!key) {
+          warnings.push(`${label} コマ${i + 2}: 動かす対象 "${move.target}" が見つかりません`);
+          continue;
+        }
+        if (Number.isFinite(move.x) && Number.isFinite(move.y)) step[key] = [round(clamp(move.x)), round(clamp(move.y))];
+        if (move.facing !== undefined && key !== 'b') facingMoves.push([key, move.facing]);
+      }
+      steps.push(step);
+      // 目線はこのコマの位置で計算する ("ball" はこのコマのボールの方)
+      const positions = positionsAt({ home, away, ball, steps }, steps.length);
+      for (const [key, value] of facingMoves) {
+        const deg = resolveFacing(value, key, positions, `${label} コマ${i + 2} ${key}`);
+        if (deg !== undefined) step[`v:${key}`] = deg;
+      }
+    });
+    return steps;
+  };
   const routeSpecs = spec.routes?.length ? spec.routes : spec.frames?.length ? [{ name: '案1', note: '', frames: spec.frames }] : [];
   const plays = routeSpecs.map((r, i) => ({
     id: `play-${i + 1}`, name: r.name || `案${i + 1}`, note: r.note ?? '', steps: buildSteps(r.frames, r.name || `案${i + 1}`),
@@ -148,7 +199,7 @@ export function buildBoard(spec, sports = loadSports()) {
     name: spec.name || `${sport.name}の配置`,
     date: spec.date || new Date().toISOString().slice(0, 10),
     sportId: sport.id,
-    home, away, ball, drawings,
+    home, away, ball, drawings, facing,
     plays: plays.length ? plays : [{ id: 'play-1', name: '案1', note: '', steps: [] }],
     activePlayId: 'play-1',
   };
@@ -204,11 +255,11 @@ export function readShareUrl(urlOrCode, sports = loadSports()) {
     name: shared.name,
     date: shared.date,
     home: {
-      players: shared.home.free.map((f) => ({ ...info(f.playerId), x: f.x, y: f.y })),
+      players: shared.home.free.map((f) => ({ ...info(f.playerId), x: f.x, y: f.y, ...facingOf(`p:${f.playerId}`) })),
       emptySlots: shared.home.slots.map((s) => ({ position: s.position, x: s.x, y: s.y })),
     },
     bench: shared.home.bench.map((id) => info(id)),
-    away: { markers: shared.away.markers.map((m) => ({ position: m.position, x: m.x, y: m.y })) },
+    away: { markers: shared.away.markers.map((m) => ({ position: m.position, x: m.x, y: m.y, ...facingOf(`m:${m.id}`) })) },
     ball: shared.ball,
     drawings: shared.drawings.map((d) => ({
       type: d.type === 'arrow' && d.dashed ? 'dashArrow' : d.type, color: d.color, width: d.width, points: d.points,
@@ -217,12 +268,29 @@ export function readShareUrl(urlOrCode, sports = loadSports()) {
     routes: (shared.plays ?? []).map((play) => ({
       name: play.name,
       note: play.note,
-      frames: play.steps.map((step) => ({
-        moves: Object.entries(step).map(([key, [x, y]]) => ({ target: targetName(key), x, y })),
-      })),
+      frames: play.steps.map((step) => ({ moves: stepMoves(step) })),
       frameCount: frameCount({ ...shared, steps: play.steps }),
       finalPositions: Object.fromEntries(Object.entries(positionsAt({ ...shared, steps: play.steps }, play.steps.length))
         .map(([key, pos]) => [targetName(key), pos])),
+      finalFacing: Object.fromEntries(Object.entries(facingAt({ ...shared, steps: play.steps }, play.steps.length))
+        .map(([key, deg]) => [targetName(key), deg])),
     })),
   };
+
+  function facingOf(key) {
+    return shared.facing?.[key] !== undefined ? { facing: shared.facing[key] } : {};
+  }
+
+  /** コマの記録 → [{ target, x?, y?, facing? }] (位置と目線を駒ごとにまとめる) */
+  function stepMoves(step) {
+    const moves = new Map();
+    for (const [key, value] of Object.entries(step)) {
+      const target = key.startsWith('v:') ? key.slice(2) : key;
+      const move = moves.get(target) ?? { target: targetName(target) };
+      if (key.startsWith('v:')) move.facing = value;
+      else [move.x, move.y] = value;
+      moves.set(target, move);
+    }
+    return [...moves.values()];
+  }
 }

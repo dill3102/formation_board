@@ -111,3 +111,31 @@ test('全スポーツでテンプレートから作れる', () => {
     assert.equal(read.home.players.length, players.length, sport.id);
   }
 });
+
+test("目線: 数字・ball・全員・コマごと、読み戻し", () => {
+  const spec = {
+    sport: "soccer",
+    home: { facing: "ball", players: [
+      { name: "A", x: 0.5, y: 0.5 },
+      { name: "B", x: 0.4, y: 0.5, facing: 90 },
+    ] },
+    away: { markers: [{ position: "GK", x: 0.9, y: 0.5 }], facing: 180 },
+    ball: { x: 0.6, y: 0.5 },
+    frames: [{ moves: [{ target: "ball", x: 0.5, y: 0.6 }, { target: "A", facing: "ball" }, { target: "B", facing: null }] }],
+  };
+  const { board, warnings } = buildBoard(spec, sports);
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(board.facing, { "p:m1": 0, "p:m2": 90, "m:a0": 180 });
+  assert.deepEqual(board.plays[0].steps[0], { b: [0.5, 0.6], "v:p:m1": 90, "v:p:m2": null });
+  const read = readShareUrl(createShareUrl(spec, { sports }).url, sports);
+  assert.equal(read.home.players.find((p) => p.name === "B").facing, 90);
+  assert.equal(read.away.markers[0].facing, 180);
+  assert.deepEqual(read.routes[0].frames[0].moves.find((m) => m.target === "A"), { target: "A", facing: 90 });
+  assert.deepEqual(read.routes[0].finalFacing, { A: 90, "away:0": 180 });
+});
+
+test("目線: ボールが無いのに ball は警告", () => {
+  const { board, warnings } = buildBoard({ sport: "soccer", home: { players: [{ name: "A", x: 0.5, y: 0.5, facing: "ball" }] } }, sports);
+  assert.deepEqual(board.facing, {});
+  assert.equal(warnings.length, 1);
+});

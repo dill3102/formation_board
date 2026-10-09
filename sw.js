@@ -6,7 +6,7 @@
 // 起動に必要なファイルはインストール時に先にキャッシュする
 // ※ ファイルを増やしたら PRECACHE に足す。キャッシュの作り直しが必要な時は VERSION を上げる
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `formation-board-${VERSION}`;
 
 const PRECACHE = [
@@ -45,6 +45,7 @@ const PRECACHE = [
   './js/board/lineup.js',
   './js/board/frames.js',
   './js/board/playback.js',
+  './js/board/vision.js',
   './js/board/drawing.js',
   './js/board/history.js',
   './js/board/toolbar.js',
